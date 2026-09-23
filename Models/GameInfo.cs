@@ -1616,6 +1616,13 @@ namespace QuiverLauncher.Models
         {
             // Browsing metadata is a label, not an authoritative release payload.
             // In particular it must not clear a pinned release or fabricate assets.
+            if (_cachedRelease != null && !ReleaseVersionIdentity.AreVersionsEquivalent(_cachedRelease.tag_name, version))
+            {
+                _cachedRelease = null;
+                ClearDownloadSelection();
+                AvailableDownloads = null;
+                DownloadChoices = null;
+            }
             _latestVersion = version;
             _preferredVersion = preferredVersion;
             DispatchPropertyChanged(nameof(LatestVersion));
@@ -1774,11 +1781,12 @@ namespace QuiverLauncher.Models
                 Repository,
                 GetReleaseApiToken(), cancellationToken: cancellationToken).ConfigureAwait(false);
         }
-        public async Task InstallReleaseAsync(HttpClient httpClient, string gamesFolder, AppSettings settings, GitHubRelease release, GitHubAsset selectedAsset)
+        public async Task InstallReleaseAsync(HttpClient httpClient, string gamesFolder, AppSettings settings, GitHubRelease release, GitHubAsset selectedAsset,
+            ReleaseInstallMode releaseMode = ReleaseInstallMode.ExplicitRelease)
         {
             GameDownloadService.SelectExplicit(this, release, settings, selectedAsset);
             await GameDownloadInstallService.DownloadAndInstallAsync(
-                this, httpClient, gamesFolder, release, settings, Status);
+                this, httpClient, gamesFolder, release, settings, Status, releaseMode: releaseMode);
         }
 
         public static string? GetPlatformIcon(string assetName)

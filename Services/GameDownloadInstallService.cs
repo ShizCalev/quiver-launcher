@@ -7,6 +7,8 @@ using QuiverLauncher.Models;
 
 namespace QuiverLauncher.Services;
 
+public enum ReleaseInstallMode { Automatic, ExplicitRelease }
+
 public static class GameDownloadInstallService
 {
     public static async Task DownloadAndInstallAsync(
@@ -17,7 +19,8 @@ public static class GameDownloadInstallService
         AppSettings settings,
         GameStatus triggerStatus,
         IGameDownloadDialogs? dialogs = null,
-        FlatpakService? flatpakService = null)
+        FlatpakService? flatpakService = null,
+        ReleaseInstallMode releaseMode = ReleaseInstallMode.Automatic)
     {
         dialogs ??= AvaloniaGameDownloadDialogs.Instance;
         flatpakService ??= FlatpakService.Current;
@@ -58,54 +61,23 @@ public static class GameDownloadInstallService
             var gamePath = game.GetInstallPath(gamesFolder);
             var versionFile = Path.Combine(gamePath, "version.txt");
 
+            if (releaseMode == ReleaseInstallMode.Automatic)
+            {
+                // Revalidate endpoint payloads even inside a background cache scope.
+                // A supplied/cached selection is not proof that it is still latest.
+                using var revalidate = ReleaseRequestCoordinator.AllowCachedMetadata(TimeSpan.Zero);
+                game.DownloadProgress = 5;
+                latestRelease = await CatalogReleaseSelection.FetchSelectedAsync(httpClient,
+                    game.RepositorySource, game.Repository, game.PreferredVersion, apiToken,
+                    LauncherSession.OperationCancellation).ConfigureAwait(false);
+                if (latestRelease != null)
+                    GitHubApiCache.SetCache(game.RepositorySource, game.Repository, latestRelease.tag_name, "", latestRelease);
+            }
             if (latestRelease == null)
             {
-                if (GitHubApiCache.TryGetCachedVersion(game.RepositorySource, game.Repository, out var cache) &&
-                    cache?.CachedRelease != null &&
-                    (string.IsNullOrWhiteSpace(game.LatestVersion) || ReleaseVersionIdentity.AreVersionsEquivalent(game.LatestVersion, cache.CachedRelease.tag_name)) &&
-                    (string.IsNullOrWhiteSpace(game.PreferredVersion) || ReleaseVersionIdentity.AreVersionsEquivalent(game.PreferredVersion, cache.CachedRelease.tag_name)))
-                {
-                    latestRelease = cache.CachedRelease;
-                }
-                else
-                {
-                    game.DownloadProgress = 5;
-                    var releaseResult = await ReleaseSourceRegistry.Default.FetchReleasesAsync(
-                        httpClient,
-                        game.RepositorySource,
-                        game.Repository,
-                        apiToken, cancellationToken: LauncherSession.OperationCancellation).ConfigureAwait(false);
-
-                    // An unsuccessful request has no releases too; it is not evidence
-                    // that the repository has no downloads (for any platform).
-                    releaseResult.EnsureSuccess();
-                    if (releaseResult.Releases.Count == 0)
-                    {
-                        ResetNotInstalled(game);
-                        await dialogs.ShowErrorAsync($"No releases found for {game.Name}.", "No Releases");
-                        return;
-                    }
-
-                    latestRelease = GameInfo.SelectLatestRelease(
-                        releaseResult.Releases,
-                        game.PreferredVersion,
-                        game.InstalledVersion,
-                        releaseResult.LatestTag);
-
-                    if (latestRelease == null)
-                    {
-                        ResetNotInstalled(game);
-                        await dialogs.ShowErrorAsync($"No valid releases found for {game.Name}.", "No Releases");
-                        return;
-                    }
-
-                    GitHubApiCache.SetCache(
-                        game.RepositorySource,
-                        game.Repository,
-                        latestRelease.tag_name,
-                        releaseResult.ETag ?? string.Empty,
-                        latestRelease);
-                }
+                ResetNotInstalled(game);
+                await dialogs.ShowErrorAsync($"No valid releases found for {game.Name}.", "No Releases");
+                return;
             }
 
             game.DownloadProgress = 10;

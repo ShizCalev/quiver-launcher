@@ -241,7 +241,7 @@ public sealed class FlatpakTests : IDisposable
         var dialogs = new RecordingDialogs();
         var release = Release("v1", "Game.flatpak");
         await GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, release,
-            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.NotInstalled, dialogs, Service());
+            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.NotInstalled, dialogs, Service(), releaseMode: ReleaseInstallMode.ExplicitRelease);
         dialogs.Error.Should().BeNull();
         game.IsFlatpak.Should().BeTrue();
         game.IsInstallIndeterminate.Should().BeFalse();
@@ -251,7 +251,7 @@ public sealed class FlatpakTests : IDisposable
         _runner.InstallError = "Runtime unavailable";
         _bundles.Receipt = _bundles.Receipt with { Commit = new string('b', 64) };
         await GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release("v2", "Game.flatpak"),
-            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.UpdateAvailable, dialogs, Service());
+            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.UpdateAvailable, dialogs, Service(), releaseMode: ReleaseInstallMode.ExplicitRelease);
         dialogs.Error.Should().Contain("Runtime unavailable");
         game.InstalledVersion.Should().Be("v1");
         game.Status.Should().Be(GameStatus.UpdateAvailable);
@@ -267,7 +267,7 @@ public sealed class FlatpakTests : IDisposable
         var dialogs = new RecordingDialogs();
         var game = new GameInfo { Name = "Game", FolderName = "game", Repository = "flatpak/" + Guid.NewGuid() };
         await GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release("v1", "Game.flatpak"),
-            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.NotInstalled, dialogs, Service());
+            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.NotInstalled, dialogs, Service(), releaseMode: ReleaseInstallMode.ExplicitRelease);
         handler.Requests.Should().Be(0);
         dialogs.Error.Should().Contain("Install Flatpak");
         game.Status.Should().Be(GameStatus.NotInstalled);
@@ -285,7 +285,7 @@ public sealed class FlatpakTests : IDisposable
         var portableExecutable = Path.Combine(GamePath, OperatingSystem.IsMacOS() ? "game" : "game.exe");
         File.WriteAllText(portableExecutable, "#!/bin/sh\nexit 0\n");
         await GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release("v1", "Game.flatpak"),
-            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.Installed, dialogs, Service());
+            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.Installed, dialogs, Service(), releaseMode: ReleaseInstallMode.ExplicitRelease);
         dialogs.Error.Should().Contain("Uninstall");
         handler.Requests.Should().Be(0);
         game.IsInstalled.Should().BeTrue();
@@ -294,7 +294,7 @@ public sealed class FlatpakTests : IDisposable
         File.Delete(portableExecutable);
         await Service().InstallAsync("Game.flatpak", "v1", GamePath);
         await GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release("v2", "Game.AppImage"),
-            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.UpdateAvailable, dialogs, Service());
+            new AppSettings { Platform = TargetOS.LinuxX64 }, GameStatus.UpdateAvailable, dialogs, Service(), releaseMode: ReleaseInstallMode.ExplicitRelease);
         handler.Requests.Should().Be(0);
         game.IsInstalled.Should().BeTrue();
     }

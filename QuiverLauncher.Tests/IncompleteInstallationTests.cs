@@ -130,7 +130,7 @@ public sealed class IncompleteInstallationTests : IDisposable
         game.LatestVersion = "v2";
         game.Status = GameStatus.UpdateAvailable;
         using var client = Client([], HttpStatusCode.InternalServerError);
-        await GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release, new(), GameStatus.UpdateAvailable, new Dialogs());
+        await GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release, new(), GameStatus.UpdateAvailable, new Dialogs(), releaseMode: ReleaseInstallMode.ExplicitRelease);
         game.Status.Should().Be(GameStatus.UpdateAvailable);
         game.InstalledVersion.Should().Be("v1");
         File.Exists(IncompletePath).Should().BeFalse();
@@ -187,7 +187,7 @@ public sealed class IncompleteInstallationTests : IDisposable
     }
 
     private Task Install(GameInfo game, HttpClient client, Dialogs dialogs) =>
-        GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release, new(), GameStatus.NotInstalled, dialogs);
+        GameDownloadInstallService.DownloadAndInstallAsync(game, client, _root, Release, new(), GameStatus.NotInstalled, dialogs, releaseMode: ReleaseInstallMode.ExplicitRelease);
     private async Task Refresh(GameInfo game)
     {
         using var client = Client([]);

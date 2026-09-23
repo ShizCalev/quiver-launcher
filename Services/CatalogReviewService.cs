@@ -111,7 +111,12 @@ public sealed class CatalogReviewService(GameManager manager, SettingsViewModel 
             await app.CheckStatusAsync(manager.HttpClient, manager.GamesFolder, checkRemoteVersion: false);
             if (CatalogPlatformIndex.TryGet(app.EffectiveRepositorySource, app.Repository, preferredVersion,
                     app.GetReleaseApiToken(settings.Current), out var metadata) && !string.IsNullOrWhiteSpace(metadata?.ReleaseTag))
-                app.ApplyCatalogVersionHint(metadata.ReleaseTag, preferredVersion);
+            {
+                if (metadata.SelectionRevision == 0)
+                    app.ApplyLastKnownVersion(metadata.ReleaseTag);
+                else
+                    app.ApplyCatalogVersionHint(metadata.ReleaseTag, preferredVersion);
+            }
             app.LoadCustomIcon(manager.CacheFolder);
             await app.LoadAndCacheDefaultIconAsync(manager.CacheFolder, allowDownload: false);
         }); }

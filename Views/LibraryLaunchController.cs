@@ -269,6 +269,7 @@ public sealed class LibraryLaunchController
     private async Task<bool> HandleUpdateNowCoreAsync(Control anchor, GameInfo game, bool preferAutoPlatform = false, bool allowAssetPicker = true, bool interactive = true)
     {
         using var priority = interactive ? ReleaseRequestCoordinator.PrioritizeInteractiveChecks() : null;
+        using var revalidate = ReleaseRequestCoordinator.AllowCachedMetadata(TimeSpan.Zero);
         try
         {
             game.IsLoading = true;
@@ -294,6 +295,8 @@ public sealed class LibraryLaunchController
             var choices = GameDownloadService.Prepare(game, latestRelease, _settings);
             if (choices.Automatic is { } automatic)
             {
+                // Install the release just revalidated above. Resolving again after
+                // applying it can lose the pin that selected this exact release.
                 await game.InstallReleaseAsync(_gameManager.HttpClient, _gameManager.GamesFolder, _settings, latestRelease, automatic);
                 await _persistence.SaveVersionPreferencesAsync(game, game.PreferredVersion, null);
                 Changed();
