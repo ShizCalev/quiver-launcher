@@ -226,6 +226,8 @@ public sealed class CatalogSourcesNavigation(CatalogSourcesView view, IFeatureNa
     internal static int GetDefaultCatalogSourceCardActionIndex(IReadOnlyList<Control> controls)
     {
         for (var i = 0; i < controls.Count; i++)
+            if (controls[i].Classes.Contains("catalog-source-review")) return i;
+        for (var i = 0; i < controls.Count; i++)
         {
             if (controls[i] is Button and not ToggleButton)
                 return i;

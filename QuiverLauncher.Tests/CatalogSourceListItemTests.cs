@@ -168,7 +168,7 @@ public class CatalogSourceListItemTests
 
         var source = new AppCatalogSource { LibraryAppCount = 1, ListAppCount = 1 };
 
-        CatalogSourceListItem.FormatUsageStats(source).Should().Be("Using 1/1 app from this list");
+        CatalogSourceListItem.FormatUsageStats(source).Should().Be("1 of 1 app in your library (all platforms)");
 
     }
 
@@ -182,7 +182,7 @@ public class CatalogSourceListItemTests
 
         var source = new AppCatalogSource { LibraryAppCount = 3, ListAppCount = 24 };
 
-        CatalogSourceListItem.FormatUsageStats(source).Should().Be("Using 3/24 apps from this list");
+        CatalogSourceListItem.FormatUsageStats(source).Should().Be("3 of 24 apps in your library (all platforms)");
 
     }
 
@@ -361,8 +361,8 @@ public class CatalogSourceListItemTests
     [Fact]
     public void FormatLibraryMembership_uses_clear_label()
     {
-        CatalogSourceListItem.FormatLibraryMembership(5, 5).Should().Be("5 of 5 apps in your library");
-        CatalogSourceListItem.FormatLibraryMembership(1, 1).Should().Be("1 of 1 app in your library");
+        CatalogSourceListItem.FormatLibraryMembership(5, 5).Should().Be("5 of 5 apps in your library (all platforms)");
+        CatalogSourceListItem.FormatLibraryMembership(1, 1).Should().Be("1 of 1 app in your library (all platforms)");
         CatalogSourceListItem.FormatLibraryMembership(0, 0).Should().BeEmpty();
     }
 
@@ -439,7 +439,7 @@ public class CatalogSourceListItemTests
 
         var item = CatalogSourceListItem.FromSource(source);
 
-        item.UsageStatsShort.Should().Be("5 of 5 apps in your library");
+        item.UsageStatsShort.Should().Be("5 of 5 apps in your library (all platforms)");
         item.UsageStatsFullLibrary.Should().BeTrue();
     }
 

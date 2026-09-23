@@ -80,6 +80,129 @@ public class HostProcessEnvironmentTests
         startInfo.Environment["WINEPREFIX"].Should().Be("/games/App/.wine-prefix");
     }
 
+    [Fact]
+    public void IsSandboxed_reflects_flatpak_id_env_var()
+    {
+        HostProcessEnvironment.IsSandboxed(_ => null).Should().BeFalse();
+        HostProcessEnvironment.IsSandboxed(_ => "").Should().BeFalse();
+        HostProcessEnvironment.IsSandboxed(name => name == "FLATPAK_ID" ? "io.github.tgeorgiadis.QuiverLauncher" : null)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void RouteToHostIfSandboxed_leaves_startInfo_untouched_when_not_sandboxed()
+    {
+        var startInfo = new ProcessStartInfo { FileName = "game", UseShellExecute = false };
+        startInfo.ArgumentList.Add("--fullscreen");
+
+        HostProcessEnvironment.RouteToHostIfSandboxed(startInfo, _ => null);
+
+        startInfo.FileName.Should().Be("game");
+        startInfo.ArgumentList.Should().Equal("--fullscreen");
+    }
+
+    [Fact]
+    public void RouteToHostIfSandboxed_wraps_via_flatpak_spawn_when_sandboxed()
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "/games/App/game",
+            UseShellExecute = false,
+            WorkingDirectory = "/games/App",
+        };
+        startInfo.ArgumentList.Add("--fullscreen");
+        startInfo.Environment["PATH"] = "/app/bin:/usr/bin";
+        startInfo.Environment["WINEPREFIX"] = "/games/App/.wine-prefix";
+
+        HostProcessEnvironment.WrapForHost(startInfo);
+
+        startInfo.FileName.Should().Be("flatpak-spawn");
+        startInfo.ArgumentList.Should().Contain("--host");
+        startInfo.ArgumentList.Should().Contain("--directory=/games/App");
+        startInfo.ArgumentList.Should().Contain("--clear-env");
+        startInfo.ArgumentList.Should().Contain("--env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+        startInfo.ArgumentList.Should().Contain("--env=WINEPREFIX=/games/App/.wine-prefix");
+
+        var separatorIndex = startInfo.ArgumentList.IndexOf("--");
+        separatorIndex.Should().BeGreaterThan(0);
+        startInfo.ArgumentList[separatorIndex + 1].Should().Be("/games/App/game");
+        startInfo.ArgumentList[separatorIndex + 2].Should().Be("--fullscreen");
+    }
+
+    [Fact]
+    public void RouteToHostIfSandboxed_strips_sandbox_identity_vars_that_break_host_processes()
+    {
+        var startInfo = new ProcessStartInfo { FileName = "proton", UseShellExecute = false };
+        startInfo.ArgumentList.Add("waitforexitandrun");
+        startInfo.Environment["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=/run/flatpak/bus";
+        startInfo.Environment["XDG_DATA_HOME"] = "/home/user/.var/app/io.github.tgeorgiadis.QuiverLauncher/data";
+        startInfo.Environment["XDG_CACHE_HOME"] = "/home/user/.var/app/io.github.tgeorgiadis.QuiverLauncher/cache";
+        startInfo.Environment["XDG_STATE_HOME"] = "/home/user/.var/app/io.github.tgeorgiadis.QuiverLauncher/.local/state";
+        startInfo.Environment["XDG_CONFIG_HOME"] = "/home/user/.var/app/io.github.tgeorgiadis.QuiverLauncher/config";
+        startInfo.Environment["XDG_DATA_DIRS"] = "/app/share:/usr/share";
+        startInfo.Environment["XAUTHORITY"] = "/run/flatpak/Xauthority";
+        startInfo.Environment["FLATPAK_ID"] = "io.github.tgeorgiadis.QuiverLauncher";
+        startInfo.Environment["FLATPAK_SANDBOX_DIR"] = "/home/user/.var/app/io.github.tgeorgiadis.QuiverLauncher/sandbox";
+        startInfo.Environment["container"] = "flatpak";
+        startInfo.Environment["PULSE_SERVER"] = "unix:/run/flatpak/pulse/native";
+        startInfo.Environment["PULSE_CLIENTCONFIG"] = "/run/flatpak/pulse/config";
+        startInfo.Environment["AT_SPI_BUS_ADDRESS"] = "unix:path=/run/flatpak/at-spi-bus";
+        startInfo.Environment["STEAM_COMPAT_APP_ID"] = "12345";
+
+        HostProcessEnvironment.WrapForHost(startInfo);
+
+        startInfo.Environment["DBUS_SESSION_BUS_ADDRESS"].Should().Be("unix:path=/run/flatpak/bus",
+            "the local flatpak-spawn process must retain access to the sandbox bus");
+        startInfo.Environment["PULSE_SERVER"].Should().Be("unix:/run/flatpak/pulse/native");
+
+        foreach (var name in HostProcessEnvironment.SandboxIdentityEnvironmentVariables)
+            startInfo.ArgumentList.Should().NotContain(arg => arg.StartsWith($"--env={name}=", StringComparison.Ordinal),
+                $"'{name}' is Quiver's own sandbox-private value and must not reach the host process");
+
+        startInfo.ArgumentList.Should().Contain("--env=STEAM_COMPAT_APP_ID=12345");
+    }
+
+    [Fact]
+    public void RouteToHostIfSandboxed_copies_xauthority_cookie_to_a_host_visible_path()
+    {
+        var dataHome = Path.Combine(Path.GetTempPath(), "quiver-xauth-test-" + Guid.NewGuid());
+        Directory.CreateDirectory(dataHome);
+        var sandboxXauthority = Path.Combine(dataHome, "sandbox-xauthority");
+        File.WriteAllBytes(sandboxXauthority, [1, 2, 3, 4]);
+        var previousDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        try
+        {
+            Environment.SetEnvironmentVariable("XDG_DATA_HOME", dataHome);
+
+            var startInfo = new ProcessStartInfo { FileName = "game", UseShellExecute = false };
+            startInfo.Environment["XAUTHORITY"] = sandboxXauthority;
+
+            HostProcessEnvironment.WrapForHost(startInfo);
+
+            var expectedCopy = Path.Combine(dataHome, "flatpak-host-xauthority");
+            File.Exists(expectedCopy).Should().BeTrue();
+            File.ReadAllBytes(expectedCopy).Should().Equal([1, 2, 3, 4]);
+            startInfo.ArgumentList.Should().Contain($"--env=XAUTHORITY={expectedCopy}");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_DATA_HOME", previousDataHome);
+            TestFixtures.CleanupDirectory(dataHome);
+        }
+    }
+
+    [Fact]
+    public void Host_wrapper_preserves_literal_arguments_and_rejects_ambiguous_command_strings()
+    {
+        var startInfo = new ProcessStartInfo("/games/my game") { UseShellExecute = false };
+        startInfo.ArgumentList.Add("space's $literal `text` % value");
+        HostProcessEnvironment.WrapForHost(startInfo);
+        startInfo.ArgumentList.TakeLast(2).Should().Equal("/games/my game", "space's $literal `text` % value");
+        var invalid = new ProcessStartInfo("game", "--option value") { UseShellExecute = false };
+        var act = () => HostProcessEnvironment.WrapForHost(invalid);
+        act.Should().Throw<ArgumentException>();
+    }
+
     static ProcessStartInfo CreatePollutedStartInfo()
     {
         var startInfo = new ProcessStartInfo { FileName = "game", UseShellExecute = false };

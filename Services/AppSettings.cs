@@ -39,6 +39,8 @@ namespace QuiverLauncher
 
     public class TagDisplayFilter
     {
+        public string? Platform { get; set; }
+        public PlatformAvailability Availability { get; set; } = PlatformAvailability.BuildAvailable;
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "";
         public List<string> Tags { get; set; } = new List<string>();
@@ -91,6 +93,9 @@ namespace QuiverLauncher
 
         [JsonIgnore]
         public int ListAppCount { get; set; }
+
+        [JsonIgnore]
+        public CatalogPlatformSummary? PlatformSummary { get; set; }
 
         /// <summary>
         /// Repository → cached list version when the user chose to ignore external changes for that app.

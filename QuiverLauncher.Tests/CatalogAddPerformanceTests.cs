@@ -74,6 +74,11 @@ public class CatalogAddPerformanceTests
             if (count == 1) game.IconUrl.Should().NotStartWith("http", "presenting the new card must not trigger the image loader's own HTTP client");
             (await manager.CatalogService.LoadLocalAppsAsync()).Should().HaveCount(count);
             model.GetFilteredBulkAddRows().Should().BeEmpty();
+            if (count > 1)
+            {
+                model.HasBulkAddSummary.Should().BeTrue();
+                model.BulkAddSummary.Should().Contain("your library").And.Contain("does not install");
+            }
         }
         finally
         {

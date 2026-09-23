@@ -17,7 +17,8 @@
 							MaxWidth="480"
 							HorizontalAlignment="Center"
 							VerticalAlignment="Center">
-						<StackPanel Spacing="12">
+						<ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="{Binding $parent[UserControl].Bounds.Height}">
+						<StackPanel Spacing="12" Margin="0,0,8,0">
 							<TextBlock x:Name="DisplayFilterOverlayTitle"
 									   Text="{Binding Title}"
 									   FontSize="18"
@@ -31,6 +32,21 @@
 									 BorderThickness="1"
 									 CornerRadius="4"
 									 Padding="8"/>
+                            <TextBlock Text="Platform availability (latest release)" FontWeight="SemiBold"/>
+                            <ComboBox x:Name="DisplayFilterPlatformComboBox" SelectedIndex="{Binding PlatformIndex, Mode=TwoWay}">
+                                <ComboBoxItem Content="No platform condition"/>
+                                <ComboBoxItem Content="Windows"/>
+                                <ComboBoxItem Content="Linux"/>
+                                <ComboBoxItem Content="macOS"/>
+                                <ComboBoxItem Content="Android"/>
+                            </ComboBox>
+                            <ComboBox x:Name="DisplayFilterAvailabilityComboBox" SelectedIndex="{Binding AvailabilityIndex, Mode=TwoWay}" IsVisible="{Binding HasPlatformCondition}">
+                                <ComboBoxItem Content="Build available"/>
+                                <ComboBoxItem Content="No build found"/>
+                                <ComboBoxItem Content="Availability unknown"/>
+                            </ComboBox>
+                            <TextBlock Text="Checks downloadable builds in the latest release, even when an older version is pinned. Unknown results are kept separate. Tag rules below also apply."
+                                       IsVisible="{Binding HasPlatformCondition}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource ThemeTextSecondary}"/>
 							<TextBlock Text="Include tags"
 									   FontSize="13"
 									   FontWeight="SemiBold"
@@ -100,6 +116,7 @@
 										Click="SaveDisplayFilter_Click"/>
 							</StackPanel>
 						</StackPanel>
+						</ScrollViewer>
 					</Border>
 				</Border>
 </UserControl>

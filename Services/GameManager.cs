@@ -51,6 +51,7 @@ namespace QuiverLauncher.Services
             !IsLibraryEmpty && HasLibrarySearch && Games.Count == 0;
         public HttpClient HttpClient => _httpClient;
         public AppCatalogService CatalogService => _catalogService;
+        public PlatformAvailabilityService PlatformAvailability { get; }
         public ModProviderRegistry ModProviderRegistry => _modProviderRegistry;
         public string AppsFolder => _appsFolder;
         public string GamesFolder => _appsFolder;
@@ -96,6 +97,7 @@ namespace QuiverLauncher.Services
                 : QuiverLauncherPaths.DefaultAppsDirectory;
 
             _cacheFolder = QuiverLauncherPaths.CacheDirectory;
+            PlatformAvailability = new(QuiverLauncherPaths.UserDataRoot);
 
             try
             {
@@ -552,6 +554,24 @@ namespace QuiverLauncher.Services
             ApplyGamesList(GetVisibleGames(settings));
         }
 
+        // Metadata changes must not clear and rebuild the collection behind a focused card.
+        public void RefreshPlatformFilteredGames()
+        {
+            var settings = _settingsStore.Current;
+            var filter = settings.TagDisplayFilters.FirstOrDefault(f => f.Id == settings.ActiveTagDisplayFilterId);
+            if (string.IsNullOrWhiteSpace(filter?.Platform)) return;
+            var desired = new GameGridViewModel().SortGames(GetVisibleGames(settings), settings.SortBy ?? "Name",
+                _appsFolder, settings.IgnoreArticlesWhenSorting).ToList();
+            for (var i = Games.Count - 1; i >= 0; i--) if (!desired.Contains(Games[i])) Games.RemoveAt(i);
+            for (var i = 0; i < desired.Count; i++)
+            {
+                var oldIndex = Games.IndexOf(desired[i]);
+                if (oldIndex < 0) Games.Insert(i, desired[i]);
+                else if (oldIndex != i) Games.Move(oldIndex, i);
+            }
+            OnPropertyChanged(nameof(HasNoLibrarySearchMatches));
+        }
+
         private async Task ApplyTagDisplayFilterAsync(AppSettings settings)
         {
             var gamesToShow = GetVisibleGames(settings);
@@ -576,7 +596,7 @@ namespace QuiverLauncher.Services
                             filter.Tags,
                             filter.MatchMode,
                             filter.ExcludeTags,
-                            filter.ExcludeMatchMode));
+                            filter.ExcludeMatchMode) && PlatformAvailability.Matches(game, settings, filter));
                 }
             }
 

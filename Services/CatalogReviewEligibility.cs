@@ -23,6 +23,8 @@ public static class CatalogReviewEligibility
     public static void Reconcile(AppCatalogSource source, IReadOnlyList<CatalogSyncRowItem> rows,
         AppSettings? settings = null, string? devicePlatform = null)
     {
+        source.PlatformSummary = CatalogPlatformSummary.Create(rows,
+            [devicePlatform ?? CatalogPlatformSupport.DetectRuntimePlatform()], settings);
         var actionable = rows.Where(r => CatalogCompareService.IsActionableRow(r, source)).ToList();
         source.PendingReviewCount = actionable.Count(r => IsRelevant(r,
             [devicePlatform ?? CatalogPlatformSupport.DetectRuntimePlatform()],

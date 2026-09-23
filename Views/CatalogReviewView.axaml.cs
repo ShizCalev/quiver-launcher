@@ -44,6 +44,23 @@ public partial class CatalogReviewView : UserControl
     public event Action? GitLabTokenSettingsRequested;
     public event Action? PlatformRetryRequested;
     private void CatalogPlatformRetry_Click(object? sender, RoutedEventArgs e) => PlatformRetryRequested?.Invoke();
+    private void CatalogPlatformExclusions_Click(object? sender, RoutedEventArgs e) => ShowPlatformExclusions();
+    public void ShowPlatformExclusions(bool forDevice = false)
+    {
+        if (Model.Source == null) return;
+        if (forDevice)
+        {
+            Model.RevealPendingPlatforms = false;
+            Model.PlatformFilters = [CatalogPlatformSupport.DetectRuntimePlatform()];
+            CatalogPlatformFilterSettings.SetFilters(_settings, Model.PlatformFilters);
+            SettingsModel.SaveCurrent();
+        }
+        Model.SetPlatformExclusions(forDevice || !Model.ShowPlatformExclusions);
+        ResetSearch();
+        RefreshCatalogReviewFilterButtons("All");
+        UpdateCatalogReviewPlatformButton();
+        ApplyCatalogSyncFilter();
+    }
     private void CatalogShowAllPending_Click(object? sender, RoutedEventArgs e)
     {
         Navigation.ClearCatalogReviewFilterGamepadFocus();
@@ -275,7 +292,7 @@ public partial class CatalogReviewView : UserControl
         }
     }
 
-    internal static readonly (string Tag, CatalogReviewFilter Filter)[] CatalogReviewFilters = [("All", CatalogReviewFilter.All), ("NeedsReview", CatalogReviewFilter.NeedsReview), ("NotInLibrary", CatalogReviewFilter.NotInLibrary), ("Changed", CatalogReviewFilter.Changed), ("UpToDate", CatalogReviewFilter.UpToDate), ("Hidden", CatalogReviewFilter.Hidden), ];
+    internal static readonly (string Tag, CatalogReviewFilter Filter)[] CatalogReviewFilters = [("All", CatalogReviewFilter.All), ("NeedsReview", CatalogReviewFilter.NeedsReview), ("NotInLibrary", CatalogReviewFilter.NotInLibrary), ("Changed", CatalogReviewFilter.Changed), ("UpToDate", CatalogReviewFilter.UpToDate), ("Hidden", CatalogReviewFilter.Hidden), ("NewPlatformSupport", CatalogReviewFilter.NewPlatformSupport) ];
     internal void CatalogTagChip_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag })
@@ -296,6 +313,7 @@ public partial class CatalogReviewView : UserControl
         if (sender is not Button { Tag: string tag })
             return;
         var filter = CatalogReviewFilters.FirstOrDefault(f => f.Tag == tag).Filter;
+        if (Model.ShowPlatformExclusions) Model.SetPlatformExclusions(false);
         _catalogSyncViewModel.ReviewFilter = filter;
         RefreshCatalogReviewFilterButtons(tag);
         ApplyCatalogSyncFilter();
@@ -313,6 +331,7 @@ public partial class CatalogReviewView : UserControl
                 "Changed" => "CatalogFilterChangedButton",
                 "UpToDate" => "CatalogFilterUpToDateButton",
                 "Hidden" => "CatalogFilterHiddenButton",
+                "NewPlatformSupport" => "CatalogFilterNewPlatformSupportButton",
                 _ => null,
             };
             if (buttonName != null && this.FindControl<Button>(buttonName)is Button button)
@@ -324,6 +343,7 @@ public partial class CatalogReviewView : UserControl
 
     internal void UpdateCatalogReviewFilterChipLabels()
     {
+        CatalogFilterNewPlatformSupportButton.Content = $"New platform support ({Model.NewPlatformSupportCount})";
         if (this.FindControl<Button>("CatalogFilterNeedsReviewButton")is Button needsReviewButton)
         {
             var count = _catalogSyncViewModel.NeedsReviewCount;
@@ -349,6 +369,17 @@ public partial class CatalogReviewView : UserControl
         }
     }
 
+    private void CatalogSupportReviewed_Click(object? sender, RoutedEventArgs e)
+    {
+        if (TryGetCatalogRowTag(sender, out var key) && FindCatalogSyncRow(key) is { } row)
+            Model.MarkPlatformSupportReviewed([row]);
+        RefreshPresentedCatalog();
+    }
+    private void CatalogSupportReviewAll_Click(object? sender, RoutedEventArgs e)
+    {
+        Model.MarkPlatformSupportReviewed(Model.GetFilteredRows().ToArray());
+        RefreshPresentedCatalog();
+    }
     internal void CatalogSyncAcknowledge_Click(object? sender, RoutedEventArgs e) => _ = _session.RunAsync(() => _catalogReview.ExecuteAsync(CatalogReviewAction.Acknowledge, null, _session.Token));
     internal void CatalogSyncRowRemoveFromLibrary_Click(object? sender, RoutedEventArgs e)
     {
@@ -403,11 +434,20 @@ public partial class CatalogReviewView : UserControl
     internal void StagePlatformDiscoveries()
     {
         Model.DeferPlatformDiscoveries();
+        Model.RefreshNewPlatformSupport();
+        if (Model.IsNewPlatformSupportView)
+        {
+            RefreshPresentedCatalog(true, CatalogSyncRows.ElementAtOrDefault(_gamepadNavigation.CatalogReviewSelectedIndex));
+            return;
+        }
         UpdateCatalogReviewFilterChipLabels();
         UpdateCatalogSyncBulkButtons();
     }
-    internal void RefreshPresentedCatalog()
+    internal void RefreshPresentedCatalog() => RefreshPresentedCatalog(false, null);
+    private void RefreshPresentedCatalog(bool preservePosition, CatalogSyncRowItem? selected)
     {
+        Model.RefreshNewPlatformSupport();
+        UpdateCatalogReviewPlatformButton();
         using var timing = CatalogPerformance.Measure("presentation", Model.AllRows.Count);
         Model.BeginPresentation();
         _catalogSyncViewModel.IgnoreArticlesWhenSorting = _settings.IgnoreArticlesWhenSorting;
@@ -419,6 +459,8 @@ public partial class CatalogReviewView : UserControl
         }
 
         ReplaceCatalogSyncRows(rows);
+        if (preservePosition && selected != null && rows.IndexOf(selected) is >= 0 and var selectedIndex)
+            _gamepadNavigation.CatalogReviewSelectedIndex = selectedIndex;
         DetailsRefreshRequested?.Invoke();
         Model.PublishPresentation();
         if (this.FindControl<TextBlock>("CatalogReviewVersionText")is TextBlock versionText)
@@ -433,7 +475,7 @@ public partial class CatalogReviewView : UserControl
         if (this.FindControl<TextBlock>("CatalogSyncEmptyText")is TextBlock emptyText)
         {
             var showNeedsReviewComplete = _catalogSyncViewModel.ShowNeedsReviewCompleteState;
-            emptyText.Text = isHiddenFilter ? "No hidden apps for this source." : Model.PlatformEmptyText;
+            emptyText.Text = Model.IsNewPlatformSupportView ? "No new support for the selected platforms. Choose All platforms to see other platform additions." : isHiddenFilter ? "No hidden apps for this source." : Model.PlatformEmptyText;
             emptyText.IsVisible = CatalogSyncRows.Count == 0 && !showNeedsReviewComplete && !Model.ShowHiddenPendingReviews;
         }
 
@@ -443,7 +485,7 @@ public partial class CatalogReviewView : UserControl
         UpdateCatalogSyncBulkButtons();
         if (_host.IsFocusActive && IsActive && (_gamepadNavigation.ActiveZone == GamepadNavigationZone.CatalogReviewList || _gamepadNavigation.ActiveZone == GamepadNavigationZone.CatalogReviewRowActions))
         {
-            Navigation.SyncCatalogReviewGamepadSelection();
+            Navigation.SyncCatalogReviewGamepadSelection(bringIntoView: !preservePosition);
         }
     }
 
@@ -556,7 +598,7 @@ public partial class CatalogReviewView : UserControl
         if (this.FindControl<Button>("CatalogReviewBulkButton")is Button bulkButton)
         {
             var showSkip = _catalogSyncViewModel.ShowSkipReviewButton;
-            bulkButton.IsVisible = PlatformCapabilities.IsMobile && (addCount > 0 || replaceCount > 0 || showSkip);
+            bulkButton.IsVisible = PlatformCapabilities.IsMobile && (addCount > 0 || replaceCount > 0 || showSkip || Model.IsNewPlatformSupportView);
         }
 
         ApplyMobileCatalogBulkFlyoutItems();
@@ -571,7 +613,7 @@ public partial class CatalogReviewView : UserControl
             skipReviewButton.IsVisible = _catalogSyncViewModel.ShowSkipReviewButton;
         if (CatalogReviewBulkPanel != null)
         {
-            CatalogReviewBulkPanel.IsVisible = !PlatformCapabilities.IsMobile && (addCount > 0 || replaceCount > 0 || _catalogSyncViewModel.ShowSkipReviewButton);
+            CatalogReviewBulkPanel.IsVisible = !PlatformCapabilities.IsMobile && (addCount > 0 || replaceCount > 0 || _catalogSyncViewModel.ShowSkipReviewButton || Model.IsNewPlatformSupportView);
         }
     }
 
@@ -657,6 +699,9 @@ public partial class CatalogReviewView : UserControl
                 break;
             case CatalogReviewGridCardActions.ChromeKind.Remove:
                 CatalogSyncRowRemoveFromLibrary_Click(button, e);
+                break;
+            case CatalogReviewGridCardActions.ChromeKind.ReviewSupport:
+                CatalogSupportReviewed_Click(sender, e);
                 break;
         }
     }
@@ -748,7 +793,17 @@ public partial class CatalogReviewView : UserControl
     {
         if (CatalogReviewPlatformButton == null)
             return;
-        CatalogReviewPlatformButton.Content = CatalogPlatformSupport.FormatLabel(Model.EffectivePlatformFilters);
+        var filters = Model.EffectivePlatformFilters;
+        var active = !CatalogPlatformSupport.IsAll(filters);
+        var label = CatalogPlatformSupport.FormatLabel(filters);
+        CatalogReviewPlatformButton.Content = active ? $"Platform: {label} ▾" : "All platforms ▾";
+        CatalogReviewPlatformButton.Classes.Set("platform-filter-active", active);
+        var tooltip = active
+            ? $"Platform filter active: {label}. Choose All platforms to see apps for every platform."
+            : "Showing apps for all platforms. Choose a platform to filter the list.";
+        ToolTip.SetTip(CatalogReviewPlatformButton, tooltip);
+        CatalogReviewFiltersToggle.Classes.Set("platform-filter-active", active);
+        ToolTip.SetTip(CatalogReviewFiltersToggle, $"View options. {tooltip}");
     }
 
     internal void ApplyCatalogReviewSortSelection(string sortMode)

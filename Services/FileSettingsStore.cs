@@ -33,6 +33,8 @@ public class FileSettingsStore : ISettingsStore
                 continue;
             source.LibraryAppCount = old.LibraryAppCount;
             source.ListAppCount = old.ListAppCount;
+            if (previous.GitHubApiToken == loaded.GitHubApiToken && previous.GitLabApiToken == loaded.GitLabApiToken)
+                source.PlatformSummary = old.PlatformSummary;
             if (old.AcknowledgedListVersion == source.AcknowledgedListVersion &&
                 old.UpdateAvailable == source.UpdateAvailable &&
                 previous.GitHubApiToken == loaded.GitHubApiToken && previous.GitLabApiToken == loaded.GitLabApiToken &&

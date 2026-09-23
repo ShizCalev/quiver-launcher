@@ -114,11 +114,11 @@ public class CatalogSyncViewModelTests
         var viewModel = new CatalogSyncViewModel();
         viewModel.Refresh(source, local, external);
 
-        viewModel.VersionBannerText.Should().Be("1.0.0 · 3/4 apps in library");
-        viewModel.VersionBannerCompactText.Should().Be("1.0.0 · 3/4 apps in library");
+        viewModel.VersionBannerText.Should().Be("1.0.0 · 3 of 4 apps in your library (all platforms)");
+        viewModel.VersionBannerCompactText.Should().Be("1.0.0 · 3 of 4 apps in your library (all platforms)");
         viewModel.VersionLastReviewedText.Should().Be("Last reviewed: not yet");
         viewModel.VersionBannerTooltip.Should().Contain("Last reviewed: not yet");
-        viewModel.VersionBannerTooltip.Should().Contain("Using 3/4 apps from this list");
+        viewModel.VersionBannerTooltip.Should().Contain("3 of 4 apps in your library (all platforms)");
         viewModel.ShowVersionBannerEmphasis.Should().BeTrue();
         viewModel.ShowVersionBanner.Should().BeTrue();
     }

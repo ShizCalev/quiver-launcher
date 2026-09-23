@@ -9,6 +9,24 @@ namespace QuiverLauncher.Tests;
 
 public class DisplayFilterEditorTests
 {
+    [Fact]
+    public void Platform_only_filter_roundtrips_and_failed_edit_restores_condition()
+    {
+        var store = new Store();
+        var model = new DisplayFilterEditorViewModel(new SettingsViewModel(store));
+        model.Open(null); model.Name = "Waiting for Linux"; model.PlatformIndex = 2; model.AvailabilityIndex = 1;
+        model.Save().Saved.Should().BeTrue();
+        var filter = store.Current.TagDisplayFilters.Single();
+        filter.Platform.Should().Be("Linux"); filter.Availability.Should().Be(PlatformAvailability.NoBuildFound);
+        var copy = System.Text.Json.JsonSerializer.Deserialize<TagDisplayFilter>(System.Text.Json.JsonSerializer.Serialize(filter))!;
+        copy.Platform.Should().Be("Linux"); copy.Availability.Should().Be(PlatformAvailability.NoBuildFound);
+        model.Close(); model.Open(filter.Id);
+        model.PlatformIndex.Should().Be(2); model.AvailabilityIndex.Should().Be(1);
+        model.PlatformIndex = 1; model.AvailabilityIndex = 0; store.FailSave = true;
+        model.Invoking(m => m.Save()).Should().Throw<IOException>();
+        filter.Platform.Should().Be("Linux"); filter.Availability.Should().Be(PlatformAvailability.NoBuildFound);
+        System.Text.Json.JsonSerializer.Deserialize<TagDisplayFilter>("{\"Tags\":[\"favorite\"]}")!.Platform.Should().BeNull();
+    }
     private sealed class Store : ISettingsStore
     {
         public AppSettings Current { get; } = new();

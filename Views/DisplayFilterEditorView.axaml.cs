@@ -22,6 +22,8 @@ public partial class DisplayFilterEditorView : UserControl
         InitializeComponent();
         GamepadComboBoxNavigation.Attach(DisplayFilterMatchModeComboBox);
         GamepadComboBoxNavigation.Attach(DisplayFilterExcludeMatchModeComboBox);
+        GamepadComboBoxNavigation.Attach(DisplayFilterPlatformComboBox);
+        GamepadComboBoxNavigation.Attach(DisplayFilterAvailabilityComboBox);
     }
 
     public void Configure(SettingsViewModel settings, LauncherSession session, IFeatureNavigationHost host, Func<string, string, Task> message, Action dismissInput)
@@ -32,7 +34,7 @@ public partial class DisplayFilterEditorView : UserControl
         _host = host;
         _message = message;
         _dismissInput = dismissInput;
-        Navigation = new(this, () => [DisplayFilterNameTextBox, DisplayFilterTagsTextBox, DisplayFilterMatchModeComboBox, DisplayFilterExcludeTagsTextBox, DisplayFilterExcludeMatchModeComboBox, CancelDisplayFilterButton, SaveDisplayFilterButton], host, GamepadNavigationZone.DisplayFilterOverlay, () => CloseRequested?.Invoke());
+        Navigation = new(this, () => new Control[] { DisplayFilterNameTextBox, DisplayFilterPlatformComboBox, DisplayFilterAvailabilityComboBox, DisplayFilterTagsTextBox, DisplayFilterMatchModeComboBox, DisplayFilterExcludeTagsTextBox, DisplayFilterExcludeMatchModeComboBox, CancelDisplayFilterButton, SaveDisplayFilterButton }.Where(c => c.IsVisible).ToList(), host, GamepadNavigationZone.DisplayFilterOverlay, () => CloseRequested?.Invoke());
     }
 
     public bool Open(string? filterId)

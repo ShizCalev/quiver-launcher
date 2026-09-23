@@ -27,7 +27,9 @@ internal static class StartupVersionResolver
         {
             var release = cached.CachedRelease;
             if (release != null && !ReleaseVersionIdentity.AreVersionsEquivalent(release.tag_name, cached.Version)) release = null;
-            evidence = new(cached.Version, new DateTimeOffset(DateTime.SpecifyKind(cached.LastChecked, DateTimeKind.Utc)),
+            var verifiedAt = cached.SelectionRevision == GameVersionCache.CurrentSelectionRevision
+                ? new DateTimeOffset(DateTime.SpecifyKind(cached.LastChecked, DateTimeKind.Utc)) : DateTimeOffset.MinValue;
+            evidence = new(cached.Version, verifiedAt,
                 StartupVersionSource.RepositoryCache, release);
         }
         if (PublishedPlatformCache.TryGet(app.EffectiveRepositorySource, app.Repository, app.PreferredVersion,

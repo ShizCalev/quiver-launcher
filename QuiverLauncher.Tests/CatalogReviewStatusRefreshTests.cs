@@ -63,10 +63,11 @@ public class CatalogReviewStatusRefreshTests
                 store.Load();
                 model.RefreshPresentation();
                 var reloadedCard = model.Sources.Single(s => s.SourceId == "nintendo");
-                reloadedCard.UsageStatsShort.Should().Be("62 of 62 apps in your library");
+                reloadedCard.UsageStatsShort.Should().Be(card.UsageStatsShort);
+                store.Current.AppCatalogSources.Single(s => s.Id == "nintendo").PlatformSummary.Should().NotBeNull();
                 reloadedCard.IsAllReviewed.Should().BeTrue();
                 if (scenario == "malformed-first-source")
-                    model.Sources.Single(s => s.SourceId == "damaged").UsageStatsShort.Should().Be("3 of 10 apps in your library");
+                    model.Sources.Single(s => s.SourceId == "damaged").UsageStatsShort.Should().Be("3 of 10 apps in your library (all platforms)");
                 // Reloading saved state and rebuilding startup availability stays clear.
                 await manager.CatalogService.RefreshAllSourcesUsageStatsAsync(new FileSettingsStore().Current);
             }

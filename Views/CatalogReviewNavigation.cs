@@ -277,6 +277,7 @@ public sealed class CatalogReviewNavigation(CatalogReviewView view, IFeatureNavi
         Add(_view.CatalogFilterChangedButton);
         Add(_view.CatalogFilterUpToDateButton);
         Add(_view.CatalogFilterHiddenButton);
+        Add(_view.CatalogFilterNewPlatformSupportButton);
         if (!PlatformCapabilities.IsMobile)
         {
             Add(_view.CatalogSearchTextBox);
@@ -321,6 +322,7 @@ public sealed class CatalogReviewNavigation(CatalogReviewView view, IFeatureNavi
             Add(_view.CatalogSyncAddAllButton);
             Add(_view.CatalogSyncReplaceAllButton);
             Add(_view.CatalogSyncAcknowledgeButton);
+            Add(_view.CatalogSupportReviewAllButton);
         }
 
 

@@ -195,7 +195,7 @@ public class CatalogSourcesFeatureTests
 
         attempts.Should().Be(2);
         model.Sources.Should().ContainSingle().Which.SourceId.Should().Be("new");
-        model.Sources[0].UsageStatsShort.Should().Be("12 of 62 apps in your library");
+        model.Sources[0].UsageStatsShort.Should().Be("12 of 62 apps in your library (all platforms)");
         model.PendingReviewCount.Should().Be(50);
     }
 

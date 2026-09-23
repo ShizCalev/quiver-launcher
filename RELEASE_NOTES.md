@@ -1,21 +1,34 @@
-# Quiver Launcher 3.4.5
+# Quiver Launcher 3.5.0-rc.1
 
-## More reliable startup version checks
+This is a prerelease for testing before 3.5.0.
 
-- Show saved latest-version information as your library loads. Versions awaiting verification stay visible with **(pending check)** instead of going blank; the hint clears after a successful check.
-- Use the shared platform index from enabled catalog sources to refresh version information for matching apps, including manually added repositories. Only apps without matching information verified within the last 24 hours need an individual repository check at startup.
-- Preserve preferred release selections and use the most recently verified information. Downloads still fetch release details when needed.
-- Check library versions independently of catalog-list refreshes, so a slow or unavailable catalog does not stop library checks. Allow up to five seconds for the shared index before falling back to repositories.
-- Retry temporary connection, timeout, and server failures once, checking only the affected apps. Manual update checks still contact repositories directly; scheduled checks keep their existing behavior.
+## Flatpak on Linux (experimental)
 
-## Library loading and app actions
+- A Linux x64 Flatpak bundle is now included with the release.
+- Install and update games distributed as direct `.flatpak` release bundles, launch them through the host, and preserve their application data when uninstalling.
+- Improve host game launching, Wine/Proton discovery, Steam integration and game process tracking when Quiver runs inside Flatpak.
+- The Flatpak launcher disables its built-in updater. Install a newer bundle to update Quiver; a Flathub repository is not yet available.
 
-- Show an animated indicator and **Loading your library…** while the local library loads, then replace it with your apps without waiting for network refreshes.
-- Keep the loading animation on the render thread so it can continue while app cards are being prepared. Preserve the existing card loading and scrolling behavior.
-- Prioritize **Download**, **Update Now**, and **Change Version** over queued background release requests while respecting active requests and provider rate limits.
-- Preserve active download and installation states during startup checks, and cancel pending startup work when Quiver closes.
+## Platform availability and filters
 
-## Platform detection fixes
+- Save filters using platform availability, tags, or both, including a platform-only filter such as “Waiting for Linux”.
+- Discover newly detected platform builds in the catalog's **New platform support** view. Notices follow the selected platforms and can be dismissed independently of catalog changes.
+- Simplify catalog cards and filter labels, make active filters clearer, and improve keyboard/gamepad navigation.
 
-- Exclude notices and source archives from platform detection and download choices. Files such as `KartPad-v0.5.0-notices.zip` no longer incorrectly imply Windows or Linux support.
-- Apply the fix to existing cached and published asset metadata without clearing caches. Ordinary app ZIP packages remain supported.
+## Installation and release fixes
+
+- Fix release selection incorrectly treating distinct version tags as equivalent. Exact tags take priority while supported numeric aliases still match.
+- Revalidate automatic release choices before installation and refresh obsolete cached selections.
+- Support Windows MSI release assets through the setup wizard, with executable selection and Windows-managed uninstall.
+
+## Flatpak testing notes
+
+Install `QuiverLauncher.flatpak` using your software manager, or run:
+
+```sh
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --user ./QuiverLauncher.flatpak
+flatpak run io.github.tgeorgiadis.QuiverLauncher
+```
+
+Flatpak uses a separate Quiver library; existing AppImage libraries are not imported automatically. Please test game installation, updates, launching and Steam shortcuts on your Linux desktop. Automated startup checks do not replace testing on real desktop/Steam Deck hardware.

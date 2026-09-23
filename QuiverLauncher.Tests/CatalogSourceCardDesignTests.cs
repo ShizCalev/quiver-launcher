@@ -30,6 +30,7 @@ public class CatalogSourceCardDesignTests
             Name = "A very long catalog name for classic console ports and recreations",
             Description = "A deliberately long description that should wrap to two lines beside the square icon without displacing the actions.",
             PendingReviewCount = 12, ListAppCount = 62, LibraryAppCount = 3,
+            PlatformSummary = new("Windows", false, 62, 3, 60, 3, 1, 1),
             LastFetchedUtc = new DateTime(2026, 9, 13, 9, 30, 0, DateTimeKind.Utc),
             LastError = "Unable to refresh this list (using cached copy)",
             CachedListVersion = "1.0", UpdateAvailable = true
@@ -50,7 +51,9 @@ public class CatalogSourceCardDesignTests
             cardPosition.X.Should().BeGreaterThanOrEqualTo(0);
             (cardPosition.X + card.Bounds.Width).Should().BeLessThanOrEqualTo(view.Bounds.Width);
             var texts = card.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).ToArray();
-            texts.Select(t => t.Text).Should().Contain(["12 apps to review", "3 of 62 apps in your library", "Unable to refresh this list (using cached copy)"]);
+            texts.Select(t => t.Text).Should().Contain(["12 apps to review", "3 of 60 Windows apps in your library",
+                "62 apps across all platforms · 1 unavailable on Windows · 1 awaiting compatibility checks",
+                "Unable to refresh this list (using cached copy)"]);
             texts.Should().NotContain(t => t.Text == "Update available" || t.Text!.StartsWith("List v"));
             foreach (var control in card.GetVisualDescendants().OfType<Control>().Where(c => c is TextBlock or Button or CheckBox && c.IsEffectivelyVisible))
             {
@@ -63,8 +66,12 @@ public class CatalogSourceCardDesignTests
             image.Width.Should().Be(48);
             image.Height.Should().Be(48);
             image.Stretch.Should().Be(Stretch.Uniform);
-            var buttons = card.GetVisualDescendants().OfType<Button>().Where(b => b is not ToggleButton).ToArray();
+            var buttons = card.GetVisualDescendants().OfType<Button>().Where(b => b is not ToggleButton && b.IsEffectivelyVisible).ToArray();
             buttons.Select(b => b.Content).Should().Equal("Review apps", "Remove");
+            var actions = card.GetVisualDescendants().OfType<Control>().Where(c =>
+                c is Button && c.IsEffectivelyVisible).ToList();
+            var defaultAction = CatalogSourcesNavigation.GetDefaultCatalogSourceCardActionIndex(actions);
+            ((Button)actions[defaultAction]).Content.Should().Be("Review apps");
             buttons[0].Focus();
             buttons[0].IsFocused.Should().BeTrue();
         }

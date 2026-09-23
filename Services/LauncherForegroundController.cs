@@ -175,6 +175,11 @@ public sealed class LauncherForegroundController : IDisposable
 
     private static async Task WaitForGameExitAsync(Process process, CancellationToken token)
     {
+        if (HostGameSession.ExitTask(process) is { } hostSession)
+        {
+            await hostSession.WaitAsync(token);
+            return;
+        }
         int? group = null;
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {

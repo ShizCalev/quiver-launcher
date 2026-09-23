@@ -18,6 +18,7 @@ public static class CatalogReviewGridCardActions
         Hide,
         Unhide,
         Remove,
+        ReviewSupport,
     }
 
     public enum ChromeKind
@@ -29,6 +30,7 @@ public static class CatalogReviewGridCardActions
         Unhide,
         Remove,
         More,
+        ReviewSupport,
     }
 
     public sealed record ChromeItem(
@@ -39,7 +41,8 @@ public static class CatalogReviewGridCardActions
         bool MenuDetails = false,
         bool MenuHide = false,
         bool MenuUnhide = false,
-        bool MenuRemove = false)
+        bool MenuRemove = false,
+        bool MenuReviewSupport = false)
     {
         public bool IsMore => Kind == ChromeKind.More;
 
@@ -52,6 +55,7 @@ public static class CatalogReviewGridCardActions
             ChromeKind.Unhide => "Unhide",
             ChromeKind.Remove => "Remove",
             ChromeKind.More => "More",
+            ChromeKind.ReviewSupport => "Dismiss",
             _ => "",
         };
 
@@ -87,7 +91,7 @@ public static class CatalogReviewGridCardActions
         bool showHide,
         bool showUnhide,
         bool showRemove,
-        string identityKey = "")
+        string identityKey = "", bool reviewSupport = false)
     {
         var all = new List<Action>(6);
         if (canAdd)
@@ -101,6 +105,8 @@ public static class CatalogReviewGridCardActions
             all.Add(Action.Unhide);
         if (showRemove)
             all.Add(Action.Remove);
+        if (reviewSupport)
+            all.Add(Action.ReviewSupport);
 
         IReadOnlyList<Action> inline;
         IReadOnlyList<Action> menu;
@@ -128,7 +134,8 @@ public static class CatalogReviewGridCardActions
                 MenuDetails: menu.Contains(Action.Details),
                 MenuHide: menu.Contains(Action.Hide),
                 MenuUnhide: menu.Contains(Action.Unhide),
-                MenuRemove: menu.Contains(Action.Remove)));
+                MenuRemove: menu.Contains(Action.Remove),
+                MenuReviewSupport: menu.Contains(Action.ReviewSupport)));
         }
 
         return new Layout(inline, menu, chrome);
@@ -142,6 +149,7 @@ public static class CatalogReviewGridCardActions
         Action.Hide => ChromeKind.Hide,
         Action.Unhide => ChromeKind.Unhide,
         Action.Remove => ChromeKind.Remove,
+        Action.ReviewSupport => ChromeKind.ReviewSupport,
         _ => ChromeKind.Details,
     };
 }

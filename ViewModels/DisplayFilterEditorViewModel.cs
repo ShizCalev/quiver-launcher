@@ -8,7 +8,12 @@ public sealed class DisplayFilterEditorViewModel(SettingsViewModel settings) : O
     private bool _open;
     private string _name = "", _tags = "", _excludeTags = "";
     private int _matchMode, _excludeMatchMode;
-    public string Title => _editingId == null ? "Add Display Filter" : "Edit Display Filter";
+    private int _platformIndex, _availabilityIndex;
+    private static readonly string?[] Platforms = [null, "Windows", "Linux", "Mac", "Android"];
+    public int PlatformIndex { get => _platformIndex; set { if (Set(ref _platformIndex, value)) Notify(nameof(HasPlatformCondition)); } }
+    public int AvailabilityIndex { get => _availabilityIndex; set => Set(ref _availabilityIndex, value); }
+    public bool HasPlatformCondition => PlatformIndex > 0 && PlatformIndex < Platforms.Length;
+    public string Title => _editingId == null ? "Add Filter" : "Edit Filter";
     public string Name { get => _name; set => Set(ref _name, value); }
     public string Tags { get => _tags; set => Set(ref _tags, value); }
     public string ExcludeTags { get => _excludeTags; set => Set(ref _excludeTags, value); }
@@ -33,6 +38,8 @@ public sealed class DisplayFilterEditorViewModel(SettingsViewModel settings) : O
         ExcludeTags = TagHelper.FormatTagsForDisplay(filter?.ExcludeTags ?? []);
         MatchModeIndex = filter?.MatchMode == TagFilterMatchMode.All ? 1 : 0;
         ExcludeMatchModeIndex = filter?.ExcludeMatchMode == TagFilterMatchMode.All ? 1 : 0;
+        PlatformIndex = Math.Max(0, Array.IndexOf(Platforms, filter?.Platform));
+        AvailabilityIndex = (int)(filter?.Availability ?? PlatformAvailability.BuildAvailable);
         Notify(null);
         return true;
     }
@@ -43,7 +50,8 @@ public sealed class DisplayFilterEditorViewModel(SettingsViewModel settings) : O
         var tags = TagHelper.ParseCommaSeparatedTags(Tags);
         var excludes = TagHelper.ParseCommaSeparatedTags(ExcludeTags);
         if (name.Length == 0) return new(false, false, "Please enter a filter name.", "Validation Error");
-        if (tags.Count == 0 && excludes.Count == 0) return new(false, false, "Please enter at least one include or exclude tag.", "Validation Error");
+        if (tags.Count == 0 && excludes.Count == 0 && !HasPlatformCondition) return new(false, false, "Please enter a tag or choose a platform condition.", "Validation Error");
+        if (HasPlatformCondition && !Enum.IsDefined((PlatformAvailability)AvailabilityIndex)) return new(false, false, "Please choose an availability condition.", "Validation Error");
         var current = settings.Current;
         current.EnsureInitialized();
         if (current.TagDisplayFilters.Any(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && !string.Equals(f.Id, _editingId, StringComparison.OrdinalIgnoreCase)))
@@ -51,7 +59,9 @@ public sealed class DisplayFilterEditorViewModel(SettingsViewModel settings) : O
         var isEdit = _editingId != null;
         var filter = isEdit ? current.TagDisplayFilters.FirstOrDefault(f => f.Id == _editingId) : new TagDisplayFilter();
         if (filter == null) return new(false, true);
-        var previous = (filter.Name, filter.Tags, filter.ExcludeTags, filter.MatchMode, filter.ExcludeMatchMode);
+        var previous = (filter.Name, filter.Tags, filter.ExcludeTags, filter.MatchMode, filter.ExcludeMatchMode, filter.Platform, filter.Availability);
+        filter.Platform = HasPlatformCondition ? Platforms[PlatformIndex] : null;
+        filter.Availability = (PlatformAvailability)AvailabilityIndex;
         filter.Name = name;
         filter.Tags = tags;
         filter.ExcludeTags = excludes;
@@ -62,7 +72,7 @@ public sealed class DisplayFilterEditorViewModel(SettingsViewModel settings) : O
         catch
         {
             if (!isEdit) current.TagDisplayFilters.Remove(filter);
-            else (filter.Name, filter.Tags, filter.ExcludeTags, filter.MatchMode, filter.ExcludeMatchMode) = previous;
+            else (filter.Name, filter.Tags, filter.ExcludeTags, filter.MatchMode, filter.ExcludeMatchMode, filter.Platform, filter.Availability) = previous;
             throw;
         }
         return new(true, isEdit);
@@ -73,6 +83,7 @@ public sealed class DisplayFilterEditorViewModel(SettingsViewModel settings) : O
         _editingId = null;
         Name = Tags = ExcludeTags = "";
         MatchModeIndex = ExcludeMatchModeIndex = 0;
+        PlatformIndex = AvailabilityIndex = 0;
     }
 }
 

@@ -2,6 +2,10 @@ namespace QuiverLauncher.Services;
 
 public interface IGameDownloadDialogs
 {
+    Task<bool> ConfirmWindowsInstallerAsync(string appName) =>
+        throw new InvalidOperationException("MSI installation requires the Windows desktop interface. Open Quiver and run the installer there.");
+    Task<string?> PickWindowsExecutableAsync(string appName, string? previousPath) =>
+        throw new InvalidOperationException("Open Quiver's Windows desktop interface and select the installed executable.");
     Task<bool> ConfirmDownloadWithoutRunnerAsync();
     Task<LinuxWindowsRunnerConfig?> ConfigureWindowsRunnerAsync(
         string gamePath,
@@ -14,6 +18,8 @@ public interface IGameDownloadDialogs
 
 public sealed class AvaloniaGameDownloadDialogs : IGameDownloadDialogs
 {
+    public Task<bool> ConfirmWindowsInstallerAsync(string appName) => GameDialogService.ConfirmWindowsInstallerAsync(appName);
+    public Task<string?> PickWindowsExecutableAsync(string appName, string? previousPath) => GameDialogService.PickWindowsExecutableAsync(appName, previousPath);
     public static AvaloniaGameDownloadDialogs Instance { get; } = new();
 
     public Task<bool> ConfirmDownloadWithoutRunnerAsync() =>
@@ -60,5 +66,9 @@ public sealed class HeadlessGameDownloadDialogs : IGameDownloadDialogs
 
     public Task ShowGitLabRateLimitExceededAsync() => Task.CompletedTask;
 
-    public Task ShowErrorAsync(string message, string title) => Task.CompletedTask;
+    public Task ShowErrorAsync(string message, string title)
+    {
+        Console.Error.WriteLine($"{title}: {message}");
+        return Task.CompletedTask;
+    }
 }

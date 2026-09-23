@@ -69,10 +69,18 @@ public sealed class FlatpakService
         _runner = runner;
         _bundles = bundles;
         // Shared by portable Quiver copies, because per-user Flatpak installations are shared too.
-        _ownersRoot = ownersRoot ?? Path.Combine(Environment.GetEnvironmentVariable("XDG_DATA_HOME") ??
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share"),
-            "QuiverLauncher", "flatpak-owners");
+        _ownersRoot = ownersRoot ?? OwnerDirectory(HostProcessEnvironment.IsSandboxed(),
+            Environment.GetEnvironmentVariable("XDG_DATA_HOME"),
+            Environment.GetEnvironmentVariable("HOST_XDG_DATA_HOME"),
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         _writeReceipt = writeReceipt ?? WriteReceipt;
+    }
+
+    internal static string OwnerDirectory(bool sandboxed, string? dataHome, string? hostDataHome, string home)
+    {
+        var sharedDataHome = sandboxed ? hostDataHome : dataHome;
+        if (string.IsNullOrWhiteSpace(sharedDataHome)) sharedDataHome = Path.Combine(home, ".local", "share");
+        return Path.Combine(sharedDataHome, "QuiverLauncher", "flatpak-owners");
     }
 
     public static bool HasReceipt(string gamePath) => File.Exists(Path.Combine(gamePath, ReceiptFileName)) ||
@@ -208,16 +216,30 @@ public sealed class FlatpakService
             WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) };
         foreach (var argument in arguments) info.ArgumentList.Add(argument);
         HostProcessEnvironment.Sanitize(info);
-        if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux() && !HostProcessEnvironment.IsSandboxed())
         {
             // Steam shortcuts need a stable executable path; also avoid resolving through an AppImage mount.
+            // (Skipped when sandboxed: the sandbox's own PATH never has a `flatpak` binary regardless of
+            // AppImage mounts, and RouteToHostIfSandboxed below resolves the bare name on the host instead.)
             info.Environment.TryGetValue("PATH", out var pathValue);
             var searchPath = pathValue ?? "/usr/local/bin:/usr/bin:/bin";
             var executable = searchPath.Split(Path.PathSeparator).Where(Path.IsPathFullyQualified)
                 .Select(directory => Path.Combine(directory, "flatpak")).FirstOrDefault(File.Exists);
             info.FileName = executable ?? throw new InvalidOperationException(SetupGuidance);
         }
+        HostProcessEnvironment.RouteToHostIfSandboxed(info);
         return info;
+    }
+
+    internal static GameShortcutTarget ShortcutTarget(FlatpakReceipt receipt, bool sandboxed)
+    {
+        // A desktop/Steam shortcut executes on the host, never through the
+        // sandbox's flatpak-spawn proxy. Resolve flatpak using the host's PATH.
+        return sandboxed
+            ? new("/usr/bin/env", ["flatpak", .. LaunchArguments(receipt)],
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+            : new(StartInfo([], capture: false).FileName, LaunchArguments(receipt),
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
     }
 
     public static string DataDirectory(FlatpakReceipt receipt)

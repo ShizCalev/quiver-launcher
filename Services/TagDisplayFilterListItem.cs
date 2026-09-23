@@ -7,10 +7,16 @@ namespace QuiverLauncher.Services
     public class TagDisplayFilterListItem : INotifyPropertyChanged
     {
         private bool _isSelected;
+        private TagDisplayFilter _filter = null!;
+        private string _name = string.Empty;
 
-        public TagDisplayFilter Filter { get; init; } = null!;
+        public TagDisplayFilter Filter
+        {
+            get => _filter;
+            init { _filter = value; _name = value.Name; }
+        }
         public string Id => Filter.Id;
-        public string Name => Filter.Name;
+        public string Name => _name;
 
         public bool IsSelected
         {
@@ -35,7 +41,7 @@ namespace QuiverLauncher.Services
             };
 
         /// <summary>
-        /// Updates <see cref="IsSelected"/> in place when the filter ids and order match.
+        /// Updates filter data and selection in place when the filter ids and order match.
         /// Returns false when the list must be rebuilt (add, delete, or reorder).
         /// </summary>
         public static bool TryUpdateSelection(
@@ -52,8 +58,17 @@ namespace QuiverLauncher.Services
                     return false;
             }
 
-            foreach (var item in items)
+            for (var i = 0; i < items.Count; i++)
             {
+                var item = items[i];
+                item._filter = filters[i];
+                // The editor mutates the existing filter, so retain the last
+                // displayed name to detect renames and notify the menu binding.
+                if (item._name != filters[i].Name)
+                {
+                    item._name = filters[i].Name;
+                    item.OnPropertyChanged(nameof(Name));
+                }
                 item.IsSelected = string.Equals(
                     item.Id,
                     activeFilterId,

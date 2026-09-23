@@ -61,6 +61,7 @@ public sealed class CatalogReleasePrefetch : IDisposable
 
     private void RefreshReviewStatus(Job job)
     {
+        _manager.PlatformAvailability.Observe(job.Rows.Select(r => r.External ?? r.Local).OfType<GameInfo>(), _settings.Current);
         CatalogReviewEligibility.Reconcile(job.Source, job.Rows, _settings.Current);
         _reviewStatusChanged();
     }
@@ -98,7 +99,17 @@ public sealed class CatalogReleasePrefetch : IDisposable
         _model.SetPlatformCheck(job.Progress);
         _model.DeferPlatformDiscoveries();
         _refresh();
+        RefreshLatestAvailability(job);
         StartWorker();
+    }
+    private void RefreshLatestAvailability(Job job, bool force = false)
+    {
+        var apps = job.Rows.Select(r => r.External ?? r.Local).OfType<GameInfo>().ToArray();
+        _manager.PlatformAvailability.Observe(apps, _settings.Current);
+        // Unpinned entries already use the existing queue and its retry/progress UI.
+        var pinned = apps.Where(a => !string.IsNullOrWhiteSpace(a.PreferredVersion)).ToArray();
+        if (pinned.Length > 0) _ = _session.RunAsync(() => _manager.PlatformAvailability.RefreshAsync(
+            _manager.HttpClient, pinned, _settings.Current, _lifetime.Token, force: force));
     }
     public void Restart()
     {
@@ -114,6 +125,7 @@ public sealed class CatalogReleasePrefetch : IDisposable
         _ = _session.RunAsync(async () =>
         {
             await PublishedPlatformCache.RefreshAsync(_manager.HttpClient, job.Source.PlatformMetadataUrl, true, _lifetime.Token);
+            RefreshLatestAvailability(job, force: !job.Source.IsCommunityManaged);
             await _dispatch(() =>
             {
                 if (_disposed) return;
@@ -126,9 +138,12 @@ public sealed class CatalogReleasePrefetch : IDisposable
     }
     private void CredentialsChanged(string provider)
     {
+        _ = _session.RunAsync(() => _manager.PlatformAvailability.RefreshAsync(_manager.HttpClient,
+            _manager.LibraryApps.ToArray(), _settings.Current, _lifetime.Token));
         foreach (var job in _jobs.Values.Where(j => j.Enabled && j.Rows.Any(r => (r.External ?? r.Local)?.EffectiveRepositorySource == provider)))
         {
             job.Context = Context; job.Pending = true; job.Due = default; job.Progress = null; job.Attempted.Clear(); job.Revision++;
+            RefreshLatestAvailability(job);
         }
         if (_activeProvider == provider) _activeRequest?.Cancel();
         // Only the new context is resumed; the coordinator retains the old context's cooldown.

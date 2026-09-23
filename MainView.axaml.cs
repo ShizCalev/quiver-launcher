@@ -324,6 +324,9 @@ namespace QuiverLauncher
                 _catalogReview.Dispose();
             });
             CatalogReviewPanel.Configure(_catalogSyncViewModel, _catalogReview, _settingsViewModel, _session, this, CatalogReviewDetailsPanel, () => Shell.Mode == MainViewMode.AppCatalog && Shell.CatalogSubView == AppCatalogSubView.Review, message => LogGamepadDebug(message));
+            _catalogSyncViewModel.Availability = _gameManager.PlatformAvailability;
+            _gameManager.PlatformAvailability.Changed += PlatformAvailabilityChanged;
+            _session.OnShutdown(() => _gameManager.PlatformAvailability.Changed -= PlatformAvailabilityChanged);
             CatalogReviewPanel.HeaderChanged += _appearance.ApplyHeader;
             CatalogReviewPanel.LibraryRequested += ShowLibraryView;
             CatalogReviewPanel.SourcesRequested += ShowAppCatalogSourcesView;
@@ -629,7 +632,7 @@ namespace QuiverLauncher
 
         private async Task ReloadLibraryAfterEditAsync()
         {
-            await _gameManager.LoadGamesAsync();
+            await _gameManager.ReloadLibraryFromDiskAsync(allowNetwork: false);
             if (!_session.IsClosed)
                 ApplySorting();
         }
@@ -867,6 +870,7 @@ namespace QuiverLauncher
 
                     Banners.ApplyTopBanner();
                 });
+                await RefreshPlatformAvailabilityAsync(allowNetwork: false);
                 // The saved library and cached source counts are already usable.
                 await RefreshStartupMetadataAsync();
                 if (_session.IsClosed) return;
@@ -895,6 +899,30 @@ namespace QuiverLauncher
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Startup library refresh failed: {ex.GetType().Name}"); }
             }
             await Task.WhenAll(RefreshLibraryAsync(), RefreshStartupCatalogsAsync());
+            await RefreshPlatformAvailabilityAsync();
+        }
+
+        private void PlatformAvailabilityChanged() => Dispatcher.UIThread.Post(() =>
+        {
+            if (_session.IsClosed) return;
+            var selected = _gameManager.Games.ElementAtOrDefault(_gamepadNavigation.LibrarySelectedIndex);
+            _gameManager.RefreshPlatformFilteredGames();
+            if (selected != null && _gameManager.Games.IndexOf(selected) is >= 0 and var index)
+                _gamepadNavigation.LibrarySelectedIndex = index;
+            if (_gamepadNavigation.ActiveZone == GamepadNavigationZone.Library && IsGamepadFocusActive)
+                LibraryPanel.Navigation.SyncGamepadLibrarySelection(bringIntoView: false);
+            if (_catalogSyncViewModel.Source != null && CatalogReviewPanel.IsActive)
+                CatalogReviewPanel.StagePlatformDiscoveries();
+        });
+
+        private async Task RefreshPlatformAvailabilityAsync(bool allowNetwork = true)
+        {
+            var catalogApps = new List<GameInfo>();
+            foreach (var source in _settings.AppCatalogSources.Where(s => s.Enabled))
+                catalogApps.AddRange(await _gameManager.CatalogService.LoadCachedAppsAsync(source.Id));
+            _gameManager.PlatformAvailability.Observe(catalogApps, _settings);
+            await _gameManager.PlatformAvailability.RefreshAsync(_gameManager.HttpClient,
+                _gameManager.LibraryApps, _settings, _session.Token, allowNetwork);
         }
 
         private async Task RefreshStartupCatalogsAsync()

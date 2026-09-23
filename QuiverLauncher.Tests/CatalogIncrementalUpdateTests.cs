@@ -21,6 +21,12 @@ public class CatalogIncrementalUpdateTests
     public void Compatibility_results_update_labels_and_bulk_actions_without_moving_cards(bool grid)
     {
         var view = new CatalogReviewView();
+        // This fixture hosts the extracted card template directly. Load its
+        // artwork sizing styles before measuring, independent of earlier tests.
+        view.Styles.Add(new Avalonia.Markup.Xaml.Styling.StyleInclude(new Uri("avares://QuiverLauncher/"))
+        {
+            Source = new Uri("avares://QuiverLauncher/Themes/LauncherStyles.axaml")
+        });
         var model = view.Model;
         var source = new AppCatalogSource { CachedListVersion = "1" };
         var apps = Enumerable.Range(0, 4).Select(i => new GameInfo

@@ -111,7 +111,12 @@ public sealed class CatalogReviewService(GameManager manager, SettingsViewModel 
             await app.CheckStatusAsync(manager.HttpClient, manager.GamesFolder, checkRemoteVersion: false);
             if (CatalogPlatformIndex.TryGet(app.EffectiveRepositorySource, app.Repository, preferredVersion,
                     app.GetReleaseApiToken(settings.Current), out var metadata) && !string.IsNullOrWhiteSpace(metadata?.ReleaseTag))
-                app.ApplyCatalogVersionHint(metadata.ReleaseTag, preferredVersion);
+            {
+                if (metadata.SelectionRevision == 0)
+                    app.ApplyLastKnownVersion(metadata.ReleaseTag);
+                else
+                    app.ApplyCatalogVersionHint(metadata.ReleaseTag, preferredVersion);
+            }
             app.LoadCustomIcon(manager.CacheFolder);
             await app.LoadAndCacheDefaultIconAsync(manager.CacheFolder, allowDownload: false);
         }); }
@@ -147,6 +152,14 @@ public sealed class CatalogReviewService(GameManager manager, SettingsViewModel 
                     continue;
                 }
                 result.EnsureSuccess();
+                var latest = CatalogReleaseSelection.SelectLatestRelease(result.Releases, githubLatestTag: result.LatestTag);
+                if (latest != null)
+                {
+                    manager.PlatformAvailability.Observe([app], settings.Current);
+                    CatalogPlatformIndex.Set(app.EffectiveRepositorySource, app.Repository, null, app.GetReleaseApiToken(settings.Current), latest);
+                    manager.PlatformAvailability.Observe([app], settings.Current);
+                    CatalogPlatformIndex.Flush();
+                }
                 var release = GameInfo.SelectLatestRelease(result.Releases, app.PreferredVersion, app.InstalledVersion, result.LatestTag);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (release != null)

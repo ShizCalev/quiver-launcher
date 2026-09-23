@@ -245,6 +245,8 @@ public sealed class LauncherUpdateWorkflow : IUpdateCheckWorkflow
                 _settingsModel.SaveCurrent();
                 CatalogsRefreshed?.Invoke();
             });
+            await Stage("platform availability", () => _gameManager.PlatformAvailability.RefreshAsync(
+                _gameManager.HttpClient, _gameManager.LibraryApps, _settings, _session.Token));
             await Stage("mods", _refreshMods);
             await Stage("artwork", () => _gameManager.LoadCustomAndCachedIconsAsync(cancellationToken: _session.Token));
             if (!_session.IsClosed) RefreshUpdateCheckStatus();

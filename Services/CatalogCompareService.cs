@@ -25,6 +25,17 @@ namespace QuiverLauncher.Services
 
     public class CatalogSyncRowItem : INotifyPropertyChanged
     {
+        public string NewPlatformSupportText { get; private set; } = "";
+        public string NewPlatformSupportDetails { get; private set; } = "";
+        public bool HasNewPlatformSupport => NewPlatformSupportText.Length > 0;
+        public void SetNewPlatformSupport(string text, string details = "")
+        {
+            if (NewPlatformSupportText == text && NewPlatformSupportDetails == details) return;
+            NewPlatformSupportText = text;
+            NewPlatformSupportDetails = details;
+            _desktopLayout = null;
+            PropertyChanged?.Invoke(this, new(null));
+        }
         public CatalogCompatibilityState CompatibilityState { get; private set; }
         public string CompatibilityText { get; private set; } = "";
         public bool HasCompatibilityText => !string.IsNullOrWhiteSpace(CompatibilityText);
@@ -204,7 +215,7 @@ namespace QuiverLauncher.Services
                 ShowCardHideButton,
                 ShowUnhideButton,
                 ShowRemoveFromLibrary,
-                IdentityKey);
+                IdentityKey, HasNewPlatformSupport);
 
         public IReadOnlyList<CatalogReviewGridCardActions.ChromeItem> GridCardDesktopChrome =>
             GetDesktopChrome();
@@ -220,7 +231,8 @@ namespace QuiverLauncher.Services
             var next = chrome.Select(item => _desktopChrome.FirstOrDefault(old =>
                 old.Kind == item.Kind && old.IdentityKey == item.IdentityKey &&
                 old.MenuAdd == item.MenuAdd && old.MenuMerge == item.MenuMerge && old.MenuDetails == item.MenuDetails &&
-                old.MenuHide == item.MenuHide && old.MenuUnhide == item.MenuUnhide && old.MenuRemove == item.MenuRemove) ?? item).ToList();
+                old.MenuHide == item.MenuHide && old.MenuUnhide == item.MenuUnhide && old.MenuRemove == item.MenuRemove &&
+                old.MenuReviewSupport == item.MenuReviewSupport) ?? item).ToList();
             _desktopChrome.UpdateWith(next);
             return _desktopChrome;
         }

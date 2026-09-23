@@ -6,6 +6,15 @@ namespace QuiverLauncher.Tests;
 public class CatalogReviewGridCardActionsTests
 {
     [Fact]
+    public void Support_review_uses_normal_inline_or_overflow_actions()
+    {
+        var installed = CatalogReviewGridCardActions.ForDesktop(false, false, false, false, true, "app", reviewSupport: true);
+        installed.Chrome.Select(c => c.Label).Should().Equal("Details", "Remove", "Dismiss");
+        var newApp = CatalogReviewGridCardActions.ForDesktop(true, false, true, false, false, "app", reviewSupport: true);
+        newApp.Chrome.Select(c => c.Label).Should().Equal("Add", "Details", "More");
+        newApp.Chrome.Last().MenuReviewSupport.Should().BeTrue();
+    }
+    [Fact]
     public void Two_actions_show_details_and_remove_without_more()
     {
         var layout = CatalogReviewGridCardActions.ForDesktop(

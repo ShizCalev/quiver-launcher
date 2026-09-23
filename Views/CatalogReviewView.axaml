@@ -53,6 +53,8 @@
 									</WrapPanel>
 									<TextBlock Text="{Binding CompatibilityText}" ToolTip.Tip="{Binding CompatibilityText}"
                                         FontSize="11" Height="16" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                                    <TextBlock IsVisible="{Binding HasNewPlatformSupport}" Text="{Binding NewPlatformSupportText}"
+                                               ToolTip.Tip="{Binding NewPlatformSupportDetails}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource ThemeAccent}"/>
                                     <TextBlock Text="{Binding Subtitle}"
 											   FontSize="10"
 											   Foreground="{DynamicResource ThemeTextSecondary}"
@@ -69,7 +71,8 @@
 										FontSize="10" Padding="8,4" MinHeight="32" HorizontalAlignment="Stretch" IsVisible="{Binding ShowAddButton}"/>
 								<Button Classes="options catalog-review-merge" Content="Merge" Tag="{Binding IdentityKey}" Click="CatalogSyncRowMerge_Click"
 										FontSize="10" Padding="8,4" MinHeight="32" HorizontalAlignment="Stretch" IsVisible="{Binding CanMerge}"/>
-								<Button Classes="options" Content="Details" Tag="{Binding IdentityKey}" Click="CatalogReviewDetails_Click"
+								<Button Classes="options" Content="Dismiss" Tag="{Binding IdentityKey}" Click="CatalogSupportReviewed_Click" IsVisible="{Binding HasNewPlatformSupport}" ToolTip.Tip="Dismiss this platform support notice" FontSize="10" Padding="8,4"/>
+<Button Classes="options" Content="Details" Tag="{Binding IdentityKey}" Click="CatalogReviewDetails_Click"
 										FontSize="10" Padding="8,4" MinHeight="32" HorizontalAlignment="Stretch"/>
 								<Button Classes="options" Content="Replace" Tag="{Binding IdentityKey}" Click="CatalogSyncRowReplace_Click"
 										FontSize="10" Padding="8,4" MinHeight="32" HorizontalAlignment="Stretch" IsVisible="{Binding CanReplace}"/>
@@ -121,7 +124,8 @@
 										FontSize="10" Padding="8,4" IsVisible="{Binding ShowAddButton}"/>
 								<Button Classes="options catalog-review-merge" Content="Merge" Tag="{Binding IdentityKey}" Click="CatalogSyncRowMerge_Click"
 										FontSize="10" Padding="8,4" IsVisible="{Binding CanMerge}"/>
-								<Button Classes="options" Content="Details" Tag="{Binding IdentityKey}" Click="CatalogReviewDetails_Click"
+								<Button Classes="options" Content="Dismiss" Tag="{Binding IdentityKey}" Click="CatalogSupportReviewed_Click" IsVisible="{Binding HasNewPlatformSupport}" ToolTip.Tip="Dismiss this platform support notice" FontSize="10" Padding="8,4"/>
+<Button Classes="options" Content="Details" Tag="{Binding IdentityKey}" Click="CatalogReviewDetails_Click"
 										FontSize="10" Padding="8,4"/>
 								<Button Classes="options" Content="Replace" Tag="{Binding IdentityKey}" Click="CatalogSyncRowReplace_Click"
 										FontSize="10" Padding="8,4" IsVisible="{Binding CanReplace}"/>
@@ -204,6 +208,9 @@
 												  FontSize="11"
 												  Foreground="{DynamicResource ThemeTextSecondary}"
 												  IsVisible="{Binding HasProjectSubtitle}"/>
+                        <TextBlock IsVisible="{Binding HasNewPlatformSupport}" Text="{Binding NewPlatformSupportText}"
+                                   ToolTip.Tip="{Binding NewPlatformSupportDetails}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                   Margin="0,4,0,0" FontSize="11" Foreground="{DynamicResource ThemeAccent}"/>
                         <ItemsControl Classes="catalog-review-grid-actions"
 									  ItemsSource="{Binding GridCardDesktopChrome}"
 									  Margin="0,6,0,0"
@@ -234,6 +241,7 @@
 												IsVisible="{Binding IsMore}">
 											<Button.Flyout>
 												<MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                                    <MenuItem Header="Dismiss support notice" Tag="{Binding IdentityKey}" Click="CatalogSupportReviewed_Click" IsVisible="{Binding MenuReviewSupport}"/>
 													<MenuItem Header="Details" Tag="{Binding IdentityKey}" Click="CatalogReviewDetails_Click"
 															  IsVisible="{Binding MenuDetails}"/>
 													<MenuItem Header="Hide" Tag="{Binding IdentityKey}" Click="CatalogSyncRowHide_Click"
@@ -266,7 +274,9 @@
 						  XYFocus.LeftNavigationStrategy="Projection"
 						  XYFocus.RightNavigationStrategy="Projection"
 						  IsVisible="True" RowDefinitions="Auto,*">
-						<StackPanel Grid.Row="0" Spacing="8">
+                        <StackPanel Grid.Row="0" Spacing="8">
+                            <TextBlock Text="{Binding BulkAddSummary}" IsVisible="{Binding HasBulkAddSummary}"
+                                       FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource ThemeText}"/>
 						<Grid ColumnDefinitions="*,Auto" MinHeight="40">
 							<DockPanel LastChildFill="True">
 								<Button x:Name="CatalogReviewTagsToggle"
@@ -319,6 +329,8 @@
 												Tag="Hidden" Click="CatalogReviewFilter_Click" MinHeight="32" Margin="0,0,6,0"
 												VerticalAlignment="Center"
 												ToolTip.Tip="Hidden from review until you unhide them"/>
+                                        <Button x:Name="CatalogFilterNewPlatformSupportButton" Classes="catalog-filter" Content="New platform support"
+                                                IsVisible="{Binding ShowNewPlatformSupportFilter}" Tag="NewPlatformSupport" Click="CatalogReviewFilter_Click" MinHeight="32" Margin="0,0,6,0"/>
 									</StackPanel>
 								</ScrollViewer>
 							</DockPanel>
@@ -343,6 +355,14 @@
 											<MenuItem Header="Linux" Tag="Linux" Click="CatalogReviewPlatformItem_Click"/>
 											<MenuItem Header="Mac" Tag="Mac" Click="CatalogReviewPlatformItem_Click"/>
 											<MenuItem Header="Android" Tag="Android" Click="CatalogReviewPlatformItem_Click"/>
+											<Separator/>
+											<MenuItem IsEnabled="False">
+												<MenuItem.Header>
+													<TextBlock Text="{Binding PlatformBreakdown}" FontSize="12" MaxWidth="280" TextWrapping="Wrap"/>
+												</MenuItem.Header>
+											</MenuItem>
+											<MenuItem Header="{Binding PlatformExclusionsButtonText}" IsVisible="{Binding HasPlatformExclusions}"
+													  Click="CatalogPlatformExclusions_Click"/>
 										</MenuFlyout>
 									</Button.Flyout>
 								</Button>
@@ -413,6 +433,8 @@
 									   Opacity="0.85"/>
 						</StackPanel>
 						<WrapPanel x:Name="CatalogReviewActionBar" Orientation="Horizontal"><WrapPanel x:Name="CatalogReviewBulkPanel" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="CatalogSupportReviewAllButton" Classes="options" Content="Dismiss visible notices"
+                                    Click="CatalogSupportReviewAll_Click" IsVisible="{Binding IsNewPlatformSupportView}" FontSize="11" MinHeight="32" Margin="0,0,8,0"/>
 							<Button x:Name="CatalogSyncAddAllButton" Classes="options catalog-review-add" Content="Add all new"
 									Click="CatalogSyncAddAll_Click" FontSize="11" MinHeight="32" Margin="0,0,8,0" IsVisible="False"/>
 							<Button x:Name="CatalogSyncReplaceAllButton" Classes="options catalog-review-merge" Content="Merge all changed"
@@ -474,6 +496,7 @@
 												  Classes="catalog-bulk-item catalog-review-add"
 												  Header="Add all"
 												  Click="CatalogSyncAddAll_Click"/>
+                                        <MenuItem Header="Dismiss visible notices" IsVisible="{Binding IsNewPlatformSupportView}" Click="CatalogSupportReviewAll_Click"/>
 										<Separator x:Name="CatalogReviewBulkAddSeparator"
 												   Classes="catalog-bulk-separator"/>
 										<MenuItem x:Name="CatalogReviewBulkMergeItem"
@@ -507,6 +530,14 @@
 										<MenuItem Header="Linux" Tag="platform:Linux" Click="CatalogReviewPlatformItem_Click"/>
 										<MenuItem Header="Mac" Tag="platform:Mac" Click="CatalogReviewPlatformItem_Click"/>
 										<MenuItem Header="Android" Tag="platform:Android" Click="CatalogReviewPlatformItem_Click"/>
+										<Separator/>
+										<MenuItem IsEnabled="False">
+											<MenuItem.Header>
+												<TextBlock Text="{Binding PlatformBreakdown}" FontSize="12" MaxWidth="280" TextWrapping="Wrap"/>
+											</MenuItem.Header>
+										</MenuItem>
+										<MenuItem Header="{Binding PlatformExclusionsButtonText}" IsVisible="{Binding HasPlatformExclusions}"
+												  Click="CatalogPlatformExclusions_Click"/>
 									</MenuFlyout>
 								</Button.Flyout>
 							</Button>

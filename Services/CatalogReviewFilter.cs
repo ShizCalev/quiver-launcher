@@ -9,4 +9,5 @@ public enum CatalogReviewFilter
     Changed,
     UpToDate,
     Hidden,
+    NewPlatformSupport,
 }

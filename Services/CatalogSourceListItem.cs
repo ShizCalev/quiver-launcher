@@ -25,6 +25,8 @@ namespace QuiverLauncher.Services
         public string UsageStatsText { get; init; } = "";
         public bool UsageStatsVisible => !string.IsNullOrEmpty(UsageStatsText);
         public string UsageStatsShort { get; init; } = "";
+        public string PlatformBreakdown { get; init; } = "";
+        public bool HasPlatformExclusions { get; init; }
         public bool UsageStatsFullLibrary { get; init; }
         public string FetchStatusText { get; init; } = "";
         public bool FetchStatusVisible => !string.IsNullOrEmpty(FetchStatusText);
@@ -108,10 +110,11 @@ namespace QuiverLauncher.Services
                 UpdateAvailable = source.UpdateAvailable,
                 PendingReviewCount = source.PendingReviewCount,
                 StatusText = GetStatusText(source),
-                UsageStatsText = FormatUsageStats(source),
-                UsageStatsShort = FormatLibraryMembership(source.LibraryAppCount, source.ListAppCount),
-                UsageStatsFullLibrary = source.ListAppCount > 0 &&
-                                        source.LibraryAppCount == source.ListAppCount,
+                UsageStatsText = source.PlatformSummary?.Membership ?? FormatUsageStats(source),
+                UsageStatsShort = source.PlatformSummary?.Membership ?? FormatLibraryMembership(source.LibraryAppCount, source.ListAppCount),
+                PlatformBreakdown = source.PlatformSummary?.Breakdown ?? "Catalog totals include all platforms; compatibility has not been checked yet.",
+                HasPlatformExclusions = source.PlatformSummary?.Excluded > 0,
+                UsageStatsFullLibrary = source.PlatformSummary?.Complete ?? (source.ListAppCount > 0 && source.LibraryAppCount == source.ListAppCount),
                 FetchStatusText = GetFetchStatusText(source),
                 StatusWarningText = statusWarning.HasValue ? statusWarning.Value.Text : "",
                 StatusWarningIsError = statusWarning.HasValue && statusWarning.Value.IsError,
@@ -130,6 +133,7 @@ namespace QuiverLauncher.Services
         }
 
         internal bool HasSamePresentation(CatalogSourceListItem other) =>
+            PlatformBreakdown == other.PlatformBreakdown && HasPlatformExclusions == other.HasPlatformExclusions &&
             IconUrl == other.IconUrl && ReviewStatusText == other.ReviewStatusText &&
             (SourceId, Name, Location, LocationToolTip, TitleToolTip, Description, Enabled,
                 UpdateAvailable, PendingReviewCount, StatusText, UsageStatsText, UsageStatsShort,
@@ -198,7 +202,7 @@ namespace QuiverLauncher.Services
                 return "";
 
             var appLabel = listAppCount == 1 ? "app" : "apps";
-            return $"Using {libraryAppCount}/{listAppCount} {appLabel} from this list";
+            return $"{libraryAppCount} of {listAppCount} {appLabel} in your library (all platforms)";
         }
 
         public static string FormatUsageStatsShort(int libraryAppCount, int listAppCount)
@@ -207,7 +211,7 @@ namespace QuiverLauncher.Services
                 return "";
 
             var appLabel = listAppCount == 1 ? "app" : "apps";
-            return $"{libraryAppCount}/{listAppCount} {appLabel} in library";
+            return $"{libraryAppCount}/{listAppCount} {appLabel} in library (all platforms)";
         }
 
         public static string FormatLibraryMembership(int libraryAppCount, int listAppCount)
@@ -216,7 +220,7 @@ namespace QuiverLauncher.Services
                 return "";
 
             var appLabel = listAppCount == 1 ? "app" : "apps";
-            return $"{libraryAppCount} of {listAppCount} {appLabel} in your library";
+            return $"{libraryAppCount} of {listAppCount} {appLabel} in your library (all platforms)";
         }
 
         public static string GetStatusText(AppCatalogSource source)

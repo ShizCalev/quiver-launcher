@@ -8,6 +8,37 @@ namespace QuiverLauncher.ViewModels;
 
 public class CatalogSyncViewModel : ObservableViewModel
 {
+    public PlatformAvailabilityService? Availability { get; set; }
+    public bool IsNewPlatformSupportView => ReviewFilter == CatalogReviewFilter.NewPlatformSupport;
+    public int NewPlatformSupportCount => AllRows.Count(HasPendingSupport);
+    public bool ShowNewPlatformSupportFilter => IsNewPlatformSupportView || NewPlatformSupportCount > 0;
+    private bool HasPendingSupport(CatalogSyncRowItem row) => Source != null &&
+        !CatalogCompareService.IsHiddenFromReview(Source, row.ReviewKey) &&
+        (row.External ?? row.Local) is { } app && SettingsModel != null &&
+        RelevantSupport(app).Count > 0;
+    private IReadOnlyList<PlatformSupportAddition> RelevantSupport(GameInfo app) =>
+        (Availability?.Pending(app, SettingsModel!.Current) ?? []).Where(change =>
+            CatalogPlatformSupport.IsAll(EffectivePlatformFilters) ||
+            CatalogPlatformSupport.IsSelected(EffectivePlatformFilters, change.Platform)).ToArray();
+    public void RefreshNewPlatformSupport()
+    {
+        InvalidatePresentation();
+        foreach (var row in AllRows)
+        {
+            var changes = IsNewPlatformSupportView && HasPendingSupport(row)
+                ? RelevantSupport((row.External ?? row.Local)!) : [];
+            row.SetNewPlatformSupport(changes.Count == 0 ? "" : "Recently available for " +
+                string.Join(", ", changes.Select(c => c.Platform == "Mac" ? "macOS" : c.Platform)),
+                string.Join("\n", changes.Select(c => $"{c.Platform} · {c.ReleaseTag} · Detected on {c.DetectedAt.ToLocalTime():d}")));
+        }
+        NotifyChanged();
+    }
+    public void MarkPlatformSupportReviewed(IEnumerable<CatalogSyncRowItem> rows)
+    {
+        if (SettingsModel == null) return;
+        Availability?.MarkReviewed(rows.Select(r => r.External ?? r.Local).OfType<GameInfo>().ToArray(), SettingsModel.Current, EffectivePlatformFilters);
+        RefreshNewPlatformSupport();
+    }
     // One presentation owns all derived values. Bindings and bulk controls read the
     // same results instead of independently traversing the catalog on every get.
     private Dictionary<string, object>? _presentation;
@@ -212,6 +243,26 @@ public class CatalogSyncViewModel : ObservableViewModel
     private bool _RevealPendingPlatforms = false;
     public bool RevealPendingPlatforms { get => _RevealPendingPlatforms; set { if (Equals(_RevealPendingPlatforms, value)) return; _RevealPendingPlatforms = value; InvalidatePresentation(); } }
     public IReadOnlyList<string> EffectivePlatformFilters => RevealPendingPlatforms ? [] : PlatformFilters;
+    public CatalogPlatformSummary PlatformSummary => Snapshot(nameof(PlatformSummary), () =>
+        CatalogPlatformSummary.Create(AllRows, EffectivePlatformFilters, SettingsModel?.Current));
+    public string PlatformBreakdown => PlatformSummary.Breakdown;
+    public string BulkAddSummary { get; set; } = "";
+    public bool HasBulkAddSummary => !string.IsNullOrEmpty(BulkAddSummary);
+    private bool _showPlatformExclusions;
+    public bool ShowPlatformExclusions => _showPlatformExclusions;
+    public bool HasPlatformExclusions => ShowPlatformExclusions || PlatformSummary.Excluded > 0;
+    public string PlatformExclusionsButtonText => ShowPlatformExclusions ? "Show all apps" : "View platform exclusions";
+    public string PlatformExclusionsExplanation => ShowPlatformExclusions
+        ? "Apps unavailable on the selected platform, or awaiting compatibility checks. Includes entries hidden from review."
+        : "Library counts describe added entries, not installed games.";
+    public void SetPlatformExclusions(bool show)
+    {
+        _showPlatformExclusions = show;
+        ReviewFilter = CatalogReviewFilter.All;
+        SearchText = "";
+        ClearTagChips();
+        InvalidatePresentation();
+    }
     private bool IsPendingForPlatform(CatalogSyncRowItem row) => Source != null &&
         CatalogReviewEligibility.IsPending(row, Source, EffectivePlatformFilters,
             (row.External ?? row.Local) is { } app ? GetPlatformToken(app) : null);
@@ -271,7 +322,7 @@ public class CatalogSyncViewModel : ObservableViewModel
 
     public bool ShowSkipReviewButton =>
         Source != null &&
-        ReviewFilter is not CatalogReviewFilter.UpToDate and not CatalogReviewFilter.Hidden &&
+        ReviewFilter is not CatalogReviewFilter.UpToDate and not CatalogReviewFilter.Hidden and not CatalogReviewFilter.NewPlatformSupport &&
         HasApplicableChanges &&
         !string.IsNullOrWhiteSpace(Source.CachedListVersion) &&
         (CatalogCompareService.IsUnreviewedVersion(Source.AcknowledgedListVersion) ||
@@ -291,9 +342,7 @@ public class CatalogSyncViewModel : ObservableViewModel
             if (Source == null || AllRows.Count == 0)
                 return "";
 
-            return CatalogSourceListItem.FormatUsageStats(
-                AllRows.Count(r => r.Local != null),
-                AllRows.Count);
+            return PlatformSummary.Membership;
         }
     }
 
@@ -339,9 +388,7 @@ public class CatalogSyncViewModel : ObservableViewModel
             var version = string.IsNullOrWhiteSpace(Source.CachedListVersion)
                 ? ""
                 : CatalogCompareService.FormatVersionForDisplay(Source.CachedListVersion);
-            var usage = CatalogSourceListItem.FormatUsageStatsShort(
-                AllRows.Count(r => r.Local != null),
-                AllRows.Count);
+            var usage = PlatformSummary.Membership;
 
             if (string.IsNullOrWhiteSpace(version))
                 return usage;
@@ -551,6 +598,13 @@ public class CatalogSyncViewModel : ObservableViewModel
     {
         if (Source == null)
             return [];
+
+        if (IsNewPlatformSupportView)
+            return CatalogCompareService.SortRows(ApplySearchFilter(ApplyTagChipFilter(AllRows.Where(HasPendingSupport))), SortBy, IgnoreArticlesWhenSorting);
+
+        if (ShowPlatformExclusions)
+            return CatalogCompareService.SortRows(ApplySearchFilter(ApplyTagChipFilter(AllRows.Where(row =>
+                !HasPlatformMetadata(row) || !IsVerifiedBulkCompatible(row)))), SortBy, IgnoreArticlesWhenSorting);
 
         return CatalogCompareService.SortRows(
             ApplySearchFilter(

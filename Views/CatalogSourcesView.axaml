@@ -40,6 +40,8 @@
                         <TextBlock Text="{Binding UsageStatsShort}" FontSize="12"
                                    Foreground="{DynamicResource ThemeTextSecondary}" TextWrapping="Wrap"
                                    IsVisible="{Binding UsageStatsVisible}"/>
+                        <TextBlock Text="{Binding PlatformBreakdown}" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource ThemeTextSecondary}"/>
                         <TextBlock Text="{Binding FetchStatusText}" FontSize="11"
                                    Foreground="{DynamicResource ThemeTextSecondary}" TextWrapping="Wrap"
                                    IsVisible="{Binding FetchStatusVisible}"/>
@@ -49,7 +51,7 @@
                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
 						<CheckBox Grid.Column="0" Content="Enabled" IsChecked="{Binding Enabled, Mode=OneWay}" Foreground="{DynamicResource ThemeText}"
 								  Tag="{Binding SourceId}" IsCheckedChanged="CatalogSourceEnabled_Changed"/>
-						<Button Grid.Column="1" Classes="options" Classes.catalog-review-pending="{Binding ShowReviewPendingStyle}"
+						<Button Grid.Column="1" Classes="options catalog-source-review" Classes.catalog-review-pending="{Binding ShowReviewPendingStyle}"
 								Content="{Binding ReviewButtonText}" HorizontalAlignment="Stretch"
 								Tag="{Binding SourceId}" Click="ReviewCatalogSource_Click" FontSize="12" Padding="10,4"/>
 						<Button Grid.Column="2" Classes="options" Content="Remove" Tag="{Binding SourceId}"

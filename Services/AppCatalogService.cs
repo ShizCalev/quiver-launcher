@@ -109,11 +109,20 @@ namespace QuiverLauncher.Services
         {
             settings.EnsureInitialized();
 
+            async Task ObservePlatforms()
+            {
+                if (_gameManager == null) return;
+                foreach (var source in settings.AppCatalogSources.Where(s => s.Enabled))
+                    _gameManager.PlatformAvailability.Observe(await LoadCachedAppsAsync(source.Id), settings);
+            }
+            await ObservePlatforms().ConfigureAwait(false);
+
             var bootstrap = new CommunityCatalogBootstrap(_locationReader);
             await bootstrap.SyncCommunitySourcesFromIndexAsync(httpClient, settings, cancellationToken, forcePlatformRefresh: true).ConfigureAwait(false);
 
             foreach (var source in settings.AppCatalogSources.Where(s => s.Enabled))
                 await FetchSourceAsync(httpClient, source, cancellationToken).ConfigureAwait(false);
+            await ObservePlatforms().ConfigureAwait(false);
         }
 
         public bool HasSourceCache(string sourceId) =>
@@ -296,9 +305,11 @@ namespace QuiverLauncher.Services
         {
             var localApps = await LoadLocalAppsAsync().ConfigureAwait(false);
             var externalApps = await LoadCachedAppsAsync(source.Id).ConfigureAwait(false);
-            var (usingCount, totalCount) = CatalogCompareService.ComputeLibraryUsageStats(localApps, externalApps);
-            source.LibraryAppCount = usingCount;
-            source.ListAppCount = totalCount;
+            var rows = CatalogCompareService.BuildCompareRows(localApps, externalApps);
+            source.LibraryAppCount = rows.Count(r => r.Local != null);
+            source.ListAppCount = rows.Count;
+            source.PlatformSummary = CatalogPlatformSummary.Create(rows,
+                [CatalogPlatformSupport.DetectRuntimePlatform()], _gameManager?.CurrentSettings);
         }
 
         public async Task RefreshAllSourcesUsageStatsAsync(AppSettings settings)

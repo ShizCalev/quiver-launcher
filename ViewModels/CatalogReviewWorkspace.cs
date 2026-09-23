@@ -47,6 +47,8 @@ public sealed class CatalogReviewWorkspace : ObservableViewModel, IDisposable
         Close();
         ActiveSource = source;
         _model.RevealPendingPlatforms = false;
+        _model.SetPlatformExclusions(false);
+        _model.BulkAddSummary = "";
         _model.ResetPlatformPresentation();
         var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
         _load = request;
@@ -246,6 +248,8 @@ public sealed class CatalogReviewWorkspace : ObservableViewModel, IDisposable
     {
         if (!Current(source, generation, token)) return;
         IsBusy = true;
+        var addedCount = 0;
+        _model.BulkAddSummary = "";
         try
         {
             if (action == CatalogReviewAction.Remove)
@@ -286,6 +290,7 @@ public sealed class CatalogReviewWorkspace : ObservableViewModel, IDisposable
                         else CatalogCompareService.ClearIgnoredChange(source, row.ReviewKey);
                     }
                     await _service.SaveLocalAsync(updated, source, token);
+                    addedCount = Math.Max(0, updated.Count - local.Count);
                     _committedLibrary = null; // This full mutation reconciles its own authoritative state.
                     if (!Current(source, generation, token)) return;
                     if (action == CatalogReviewAction.AddAll && blocked.Count > 0) await ShowBlockedAsync(blocked);
@@ -296,6 +301,16 @@ public sealed class CatalogReviewWorkspace : ObservableViewModel, IDisposable
             if (!Current(source, generation, token)) return;
             _settings.SaveCurrent();
             await _refreshSourcesAndBadges();
+            if (action == CatalogReviewAction.AddAll && Current(source, generation, token))
+            {
+                var summary = _model.PlatformSummary;
+                var complete = !summary.AllPlatforms && summary.Available > 0 && summary.AvailableInLibrary == summary.Available;
+                _model.BulkAddSummary = (complete
+                    ? $"All verified {summary.Platform} apps are now in your library."
+                    : $"Added {addedCount} apps matching the current filters to your library.") +
+                    " " + summary.Breakdown + ". Adding to your library does not install the apps.";
+                _model.NotifyChanged();
+            }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)

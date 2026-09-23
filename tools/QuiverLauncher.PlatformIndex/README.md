@@ -18,6 +18,11 @@ must change there together. If a selection change makes old evidence unsafe,
 bump `PublishedPlatformDocument.CurrentRevision` and the emitted entry revision;
 old clients reject unsupported revisions while retaining their previous cache.
 
+Tag lookup prefers an exact match before numeric aliases such as `v1.2` and
+`1.2.0`. Nonnumeric tags and prerelease suffixes keep their own identities;
+`Version1.0.4` must never match `Version1.0.5beta9`. The publisher's latest-only
+request and the launcher's full release list must select the same tag.
+
 Entries are keyed by provider, normalized repository (case-insensitive only for
 GitHub) and preferred release. Store asset names before app-specific filtering.
 No download URLs, credentials, user preferences or review acknowledgements are
