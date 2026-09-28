@@ -113,18 +113,25 @@ public class ReleaseRequestCoordinatorTests
     }
 
     [Fact]
-    public async Task Serializes_different_github_requests()
+    public async Task Runs_concurrent_github_requests()
     {
         var active = 0; var maximum = 0;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var client = new HttpClient(new Handler(async (_, ct) =>
         {
             maximum = Math.Max(maximum, Interlocked.Increment(ref active));
-            await Task.Delay(10, ct);
+            if (Volatile.Read(ref active) == 8) entered.TrySetResult();
+            await release.Task.WaitAsync(ct);
             Interlocked.Decrement(ref active); return Ok();
         }));
         var coordinator = new ReleaseRequestCoordinator();
-        await Task.WhenAll(Enumerable.Range(0, 8).Select(i => coordinator.FetchAsync(client, new Uri(Endpoint + "?id=" + i), "github", "test", Parse)));
-        Assert.Equal(1, maximum);
+        var requests = Task.WhenAll(Enumerable.Range(0, 8)
+            .Select(i => coordinator.FetchAsync(client, new Uri(Endpoint + "?id=" + i), "github", "test", Parse)));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(8, maximum);
+        release.TrySetResult();
+        await requests;
     }
 
     [Fact]

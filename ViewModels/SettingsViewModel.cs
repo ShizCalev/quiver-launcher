@@ -16,18 +16,36 @@ public class SettingsViewModel : ObservableViewModel
     public void SaveApiToken(string provider, string? draft)
     {
         var value = draft?.Trim() ?? "";
-        var github = provider == "github";
-        var previous = github ? Current.GitHubApiToken : Current.GitLabApiToken;
+        var previous = GetApiToken(provider);
         if (previous == value) return;
-        if (github) Current.GitHubApiToken = value; else Current.GitLabApiToken = value;
+        SetApiToken(provider, value);
         try { Save(Current); }
         catch (Exception ex)
         {
-            if (github) Current.GitHubApiToken = previous; else Current.GitLabApiToken = previous;
+            SetApiToken(provider, previous);
             SaveFailed?.Invoke(ex);
             return;
         }
         CredentialsChanged?.Invoke(provider);
+    }
+
+    private string GetApiToken(string provider) => provider switch
+    {
+        "github" => Current.GitHubApiToken,
+        "gitlab" => Current.GitLabApiToken,
+        "codeberg" => Current.CodebergApiToken,
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unsupported release provider."),
+    };
+
+    private void SetApiToken(string provider, string value)
+    {
+        switch (provider)
+        {
+            case "github": Current.GitHubApiToken = value; break;
+            case "gitlab": Current.GitLabApiToken = value; break;
+            case "codeberg": Current.CodebergApiToken = value; break;
+            default: throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unsupported release provider.");
+        }
     }
 
 

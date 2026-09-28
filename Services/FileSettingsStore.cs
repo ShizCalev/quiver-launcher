@@ -35,7 +35,7 @@ public class FileSettingsStore : ISettingsStore
             source.ListAppCount = old.ListAppCount;
             if (old.AcknowledgedListVersion == source.AcknowledgedListVersion &&
                 old.UpdateAvailable == source.UpdateAvailable &&
-                previous.GitHubApiToken == loaded.GitHubApiToken && previous.GitLabApiToken == loaded.GitLabApiToken &&
+                previous.GitHubApiToken == loaded.GitHubApiToken && previous.GitLabApiToken == loaded.GitLabApiToken && previous.CodebergApiToken == loaded.CodebergApiToken &&
                 old.HiddenFromReviewRepositories.SequenceEqual(source.HiddenFromReviewRepositories) &&
                 old.IgnoredChangesAtVersion.Count == source.IgnoredChangesAtVersion.Count &&
                 old.IgnoredChangesAtVersion.All(pair => source.IgnoredChangesAtVersion.TryGetValue(pair.Key, out var value) && value == pair.Value))

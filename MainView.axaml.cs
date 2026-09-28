@@ -218,7 +218,7 @@ namespace QuiverLauncher
                     }
                 }, _session.Token));
             }
-            Banners.Configure(_session, _settingsViewModel, _gameManager.HttpClient, this, OpenGitHubApiTokenSettings);
+            Banners.Configure(_session, _settingsViewModel, _gameManager.HttpClient, this, provider => OpenAdvancedApiTokenSettings(provider == "gitlab"));
             Library = new LibraryViewModel(_gameManager, _settingsViewModel);
             if (_initializeOnOpen) Library.BeginInitialLoad();
             LibraryToolbar.Configure(Library, _session, OnSettingChanged);
@@ -895,6 +895,8 @@ namespace QuiverLauncher
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Startup library refresh failed: {ex.GetType().Name}"); }
             }
             await Task.WhenAll(RefreshLibraryAsync(), RefreshStartupCatalogsAsync());
+            if (!_session.IsClosed)
+                await Dispatcher.UIThread.InvokeAsync(SettingsPanel.RefreshApiRateLimits);
         }
 
         private async Task RefreshStartupCatalogsAsync()
@@ -1270,6 +1272,7 @@ namespace QuiverLauncher
 
         IReadOnlyList<GameInfo> IAppUpdateReviewActions.GetReviewRows() => _updates.GetAppUpdateReviewRows();
         IReadOnlyList<GameInfo> IAppUpdateReviewActions.GetPendingUpdates() => _updates.GetPendingAppUpdates();
+        Task IAppUpdateReviewActions.CheckForUpdatesAsync() => RunUpdateCheckAsync(promptForReview: true, isManualCheck: true);
         async Task IAppUpdateReviewActions.UpdateAsync(GameInfo game, bool automaticSelection) => await _libraryLaunch.HandleUpdateNowAsync(AppUpdatesReviewPanel.GetUpdateAnchor(game), game, preferAutoPlatform: automaticSelection);
         Task IAppUpdateReviewActions.SkipAsync(GameInfo game) => _libraryLaunch.HandleSkipUpdateAsync(game);
         void IAppUpdateReviewActions.ShowVersions(GameInfo game) => _libraryLaunch.ShowUpdateActionMenu(AppUpdatesReviewPanel.GetVersionsAnchor(game), game);
@@ -1406,7 +1409,9 @@ namespace QuiverLauncher
             CatalogReviewPanel.RefreshPresentedCatalog();
             CatalogReviewPanel.UpdateCatalogReviewPlatformButton();
             CatalogReviewPanel.UpdateCatalogSyncBulkButtons();
-            _catalogCredentialContext = ReleaseRequestCoordinator.CredentialKey(_settings.GitHubApiToken) + ":" + ReleaseRequestCoordinator.CredentialKey(_settings.GitLabApiToken);
+            _catalogCredentialContext = ReleaseRequestCoordinator.CredentialKey(_settings.GitHubApiToken) + ":" +
+                ReleaseRequestCoordinator.CredentialKey(_settings.GitLabApiToken) + ":" +
+                ReleaseRequestCoordinator.CredentialKey(_settings.CodebergApiToken);
             _catalogReleasePrefetch.Start();
         }
 
@@ -1468,7 +1473,15 @@ namespace QuiverLauncher
             }
         }
 
-        private async void CheckforUpdates_Click(object sender, RoutedEventArgs e) => await RunUpdateCheckAsync(promptForReview: true, isManualCheck: true);
+        private async void CheckforUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            if (Shell.PendingUpdatesCount > 0)
+            {
+                OpenAppUpdatesReview();
+                return;
+            }
+            await RunUpdateCheckAsync(promptForReview: true, isManualCheck: true);
+        }
         private void CancelUpdateCheck_Click(object? sender, EventArgs e) { CheckForUpdatesButton.Focus(); _updateChecks.Cancel(); }
         private void DismissUpdateCheck_Click(object? sender, EventArgs e)
         {
@@ -1485,6 +1498,7 @@ namespace QuiverLauncher
             if (isManualCheck && Shell.Mode == MainViewMode.AppCatalog && Shell.CatalogSubView == AppCatalogSubView.Review)
                 _catalogReleasePrefetch.RefreshAll();
             await _updateChecks.CheckAsync(promptForReview, isManualCheck, _session.Token);
+            Dispatcher.UIThread.Post(SettingsPanel.RefreshApiRateLimits);
         });
         private void GithubButton_Click(object sender, RoutedEventArgs e)
         {
