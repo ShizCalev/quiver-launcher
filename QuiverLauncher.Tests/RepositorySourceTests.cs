@@ -15,6 +15,7 @@ public class RepositorySourceTests
     [InlineData("GitHub", "github", false)]
     [InlineData("gitlab", "gitlab", false)]
     [InlineData("GitLab", "gitlab", false)]
+    [InlineData("codeberg", "codeberg", false)]
     [InlineData("bitbucket", "github", true)]
     public void Normalize_handles_known_and_unknown_sources(string? input, string expected, bool unsupported)
     {
@@ -30,6 +31,8 @@ public class RepositorySourceTests
             .Should().Be("github:owner/app");
         RepositorySourceHelper.GetIdentityKey("gitlab", "group/project")
             .Should().Be("gitlab:group/project");
+        RepositorySourceHelper.GetIdentityKey("codeberg", "owner/project")
+            .Should().Be("codeberg:owner/project");
         RepositorySourceHelper.GetIdentityKey(null, null, "MyFolder")
             .Should().Be("manual:MyFolder");
         RepositorySourceHelper.GetInstanceKey(null, "owner/app", "FolderA")
@@ -43,7 +46,7 @@ public class RepositorySourceTests
     }
 
     [Fact]
-    public async Task Parse_and_serialize_omits_github_and_round_trips_gitlab()
+    public async Task Parse_and_serialize_omits_github_and_round_trips_known_sources()
     {
         var dir = Path.Combine(Path.GetTempPath(), "QuiverRepoSource_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -72,6 +75,13 @@ public class RepositorySourceTests
                     RepositorySource = "bitbucket",
                     FolderName = "UnknownApp",
                 },
+                new()
+                {
+                    Name = "Codeberg App",
+                    Repository = "owner/codeberg-app",
+                    RepositorySource = "codeberg",
+                    FolderName = "CodebergApp",
+                },
             };
 
             await catalog.SaveLocalAppsAsync(apps);
@@ -81,12 +91,16 @@ public class RepositorySourceTests
 
             array[0].TryGetProperty("repositorySource", out _).Should().BeFalse();
             array[1].GetProperty("repositorySource").GetString().Should().Be("gitlab");
+            array[3].GetProperty("repositorySource").GetString().Should().Be("codeberg");
 
             var loaded = await catalog.LoadLocalAppsAsync();
             loaded.Should().ContainSingle(a => a.Repository == "owner/github-app" && a.RepositorySource == null);
             loaded.Should().ContainSingle(a =>
                 a.Repository == "bighead.0/ladxhd_updated" &&
                 a.EffectiveRepositorySource == "gitlab");
+            loaded.Should().ContainSingle(a =>
+                a.Repository == "owner/codeberg-app" &&
+                a.EffectiveRepositorySource == "codeberg");
             loaded.Should().ContainSingle(a =>
                 a.Repository == "owner/unknown" &&
                 a.EffectiveRepositorySource == "github" &&
@@ -109,8 +123,17 @@ public class RepositorySourceTests
             RepositorySource = "gitlab",
             FolderName = "B",
         };
+        var codeberg = new GameInfo
+        {
+            Name = "CB",
+            Repository = "owner/app",
+            RepositorySource = "codeberg",
+            FolderName = "C",
+        };
 
         github.IdentityKey.Should().NotBe(gitlab.IdentityKey);
+        github.IdentityKey.Should().NotBe(codeberg.IdentityKey);
+        gitlab.IdentityKey.Should().NotBe(codeberg.IdentityKey);
 
         var rows = CatalogCompareService.BuildCompareRows(
             [github],
@@ -162,10 +185,48 @@ public class RepositorySourceTests
     }
 
     [Fact]
+    public void CodebergReleaseSource_maps_forgejo_release_assets()
+    {
+        var releases = CodebergReleaseSource.MapReleasesFromJson("""
+        [{"tag_name":"v1.2.3","prerelease":false,"assets":[{"name":"app.zip","browser_download_url":"https://codeberg.org/a/b/releases/download/v1.2.3/app.zip"}]}]
+        """);
+
+        releases.Should().ContainSingle();
+        releases[0].tag_name.Should().Be("v1.2.3");
+        releases[0].assets.Should().ContainSingle(a => a.name == "app.zip");
+    }
+
+    [Fact]
     public void GetCacheKey_uses_composite_source_and_repository()
     {
         GitHubApiCache.GetCacheKey(null, "owner/app").Should().Be("github:owner/app");
         GitHubApiCache.GetCacheKey("gitlab", "group/project").Should().Be("gitlab:group/project");
+        GitHubApiCache.GetCacheKey("codeberg", "owner/project").Should().Be("codeberg:owner/project");
+    }
+
+    [Fact]
+    public void Release_tokens_are_kept_per_source()
+    {
+        var settings = new AppSettings
+        {
+            GitHubApiToken = "github-token",
+            GitLabApiToken = "gitlab-token",
+            CodebergApiToken = "codeberg-token",
+        };
+
+        new GameInfo { Repository = "owner/github" }.GetReleaseApiToken(settings).Should().Be("github-token");
+        new GameInfo { Repository = "group/gitlab", RepositorySource = "gitlab" }.GetReleaseApiToken(settings).Should().Be("gitlab-token");
+        new GameInfo { Repository = "owner/codeberg", RepositorySource = "codeberg" }.GetReleaseApiToken(settings).Should().Be("codeberg-token");
+    }
+
+    [Theory]
+    [InlineData(RepositorySourceIds.GitHub, "owner/project", "https://github.com/owner/project", "GitHub")]
+    [InlineData(RepositorySourceIds.GitLab, "group/project", "https://gitlab.com/group/project", "GitLab")]
+    [InlineData(RepositorySourceIds.Codeberg, "owner/project", "https://codeberg.org/owner/project", "Codeberg")]
+    public void Repository_page_urls_and_display_names_match_source(string source, string repository, string url, string displayName)
+    {
+        RepositorySourceHelper.GetRepositoryPageUrl(source, repository).Should().Be(url);
+        RepositorySourceHelper.DisplayName(source).Should().Be(displayName);
     }
 
     [Fact]
@@ -184,6 +245,7 @@ public class RepositorySourceTests
         var registry = ReleaseSourceRegistry.Default;
         registry.Get(null).Id.Should().Be(RepositorySourceIds.GitHub);
         registry.Get("gitlab").Id.Should().Be(RepositorySourceIds.GitLab);
+        registry.Get("codeberg").Id.Should().Be(RepositorySourceIds.Codeberg);
         registry.Get("gitea").Id.Should().Be(RepositorySourceIds.GitHub);
     }
 }

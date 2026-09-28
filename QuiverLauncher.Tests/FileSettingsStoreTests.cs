@@ -62,6 +62,7 @@ public class FileSettingsStoreTests : IDisposable
         var settings = store.Load();
         settings.GitHubApiToken = "test-token";
         settings.GitLabApiToken = "gitlab-token";
+        settings.CodebergApiToken = "codeberg-token";
         settings.SortBy = "Name";
         settings.MouseWheelScrollSpeed = 3;
         settings.CatalogReviewSortBy = "Repository";
@@ -79,6 +80,7 @@ public class FileSettingsStoreTests : IDisposable
         var reloaded = new FileSettingsStore(_settingsPath).Load();
         reloaded.GitHubApiToken.Should().Be("test-token");
         reloaded.GitLabApiToken.Should().Be("gitlab-token");
+        reloaded.CodebergApiToken.Should().Be("codeberg-token");
         reloaded.SortBy.Should().Be("Name");
         reloaded.MouseWheelScrollSpeed.Should().Be(3);
         reloaded.CatalogReviewSortBy.Should().Be("Repository");

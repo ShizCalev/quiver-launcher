@@ -57,7 +57,8 @@ public sealed class CatalogReleasePrefetch : IDisposable
         if (e.PropertyName == nameof(CatalogReviewWorkspace.IsLoading) && !_workspace.IsLoading && _isActive()) Start();
     }
     private string Context => ReleaseRequestCoordinator.CredentialKey(_settings.Current.GitHubApiToken) + ":" +
-        ReleaseRequestCoordinator.CredentialKey(_settings.Current.GitLabApiToken);
+        ReleaseRequestCoordinator.CredentialKey(_settings.Current.GitLabApiToken) + ":" +
+        ReleaseRequestCoordinator.CredentialKey(_settings.Current.CodebergApiToken);
 
     private void RefreshReviewStatus(Job job)
     {
@@ -178,7 +179,13 @@ public sealed class CatalogReleasePrefetch : IDisposable
                 var allRows = FetchRows(job);
                 var github = _settings.Current.GitHubApiToken;
                 var gitlab = _settings.Current.GitLabApiToken;
-                string Token(GameInfo game) => game.EffectiveRepositorySource == "gitlab" ? gitlab : github;
+                var codeberg = _settings.Current.CodebergApiToken;
+                string Token(GameInfo game) => game.EffectiveRepositorySource switch
+                {
+                    "gitlab" => gitlab,
+                    "codeberg" => codeberg,
+                    _ => github,
+                };
                 string Key(CatalogSyncRowItem row)
                 {
                     var game = (row.External ?? row.Local)!;
