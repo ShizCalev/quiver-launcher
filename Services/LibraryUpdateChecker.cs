@@ -106,6 +106,7 @@ public sealed class LibraryUpdateChecker(HttpClient client, AppSettings settings
             results[index] = result;
             progress?.Report(new(Interlocked.Increment(ref completed), targets.Length, result));
         }));
+        coordinator.FlushCachedResponses();
         var invalidProviders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (_, credential) in credentialsToValidate)
         {

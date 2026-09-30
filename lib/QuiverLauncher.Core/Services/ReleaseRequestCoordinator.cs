@@ -48,7 +48,13 @@ public sealed class ReleaseRequestCoordinator
     public long RequestCount => Interlocked.Read(ref _requestCount);
     private static readonly ConditionalWeakTable<HttpClient, ReleaseRequestCoordinator> Instances = new();
     public static ReleaseRequestCoordinator For(HttpClient client) => Instances.GetValue(client, _ => new());
-    public static void Configure(HttpClient client, string cacheDirectory) => For(client)._cache = new(cacheDirectory);
+    public static void Configure(HttpClient client, string cacheDirectory)
+    {
+        var coordinator = For(client);
+        coordinator._cache = new(cacheDirectory, persistEntries: false);
+        coordinator._cache.FlushEntries();
+    }
+    public void FlushCachedResponses() => _cache.FlushEntries();
     private static readonly ConditionalWeakTable<string, StrongBox<string>> CredentialKeys = new();
     public static string CredentialKey(string? token) => string.IsNullOrWhiteSpace(token) ? "anonymous"
         : CredentialKeys.GetValue(token, value => new(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value.Trim()))))).Value!;
